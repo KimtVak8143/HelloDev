@@ -1,0 +1,5 @@
+#!/bin/bash
+MSG=$(git log -1 --pretty=%B)
+curl -s -X POST http://localhost:3333/commit \
+  -H "Content-Type: application/json" \
+  -d "{\"message\": \"$MSG\"}" > /dev/null
