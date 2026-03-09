@@ -1,61 +1,117 @@
-// Task CRUD Ops
-
 const notion = require("./client");
+require("dotenv").config();
 
-// Mark task In Progress + create log sheet
-async function startTask(bugId, developerName) {
-  // 1. Find task by Bug ID
+// ─── Find task by Bug/Feature ID ───────────────────────────────────────────
+async function findTask(bugId) {
   const res = await notion.databases.query({
     database_id: process.env.SPRINT_DB_ID,
-    filter: { property: "Bug/Feature ID", rich_text: { equals: bugId } }
+    filter: {
+      property: "Bug/Feature ID",
+      rich_text: { equals: bugId },
+    },
   });
 
-  const task = res.results[0];
-  if (!task) throw new Error(`Task ${bugId} not found`);
+  if (!res.results.length) throw new Error(`❌ Task "${bugId}" not found in Sprint Board.`);
+  return res.results[0];
+}
 
-  // 2. Update status to In Progress
+// ─── Start a task: mark In Progress + create log sheet ────────────────────
+async function startTask(bugId, developerName) {
+  const task = await findTask(bugId);
+
+  // Update task status → In Progress
   await notion.pages.update({
     page_id: task.id,
-    properties: { Status: { select: { name: "In Progress" } } }
+    properties: {
+      Status: { select: { name: "In Progress" } },
+    },
   });
 
-  // 3. Create a linked log sheet
+  // Create a new Activity Log entry linked to this task
   const log = await notion.pages.create({
     parent: { database_id: process.env.LOGS_DB_ID },
     properties: {
-      "Log Title": { title: [{ text: { content: `${developerName} - ${bugId}` } }] },
-      "Developer": { rich_text: [{ text: { content: developerName } }] },
-      "Session Start": { date: { start: new Date().toISOString() } },
-      "Task": { relation: [{ id: task.id }] }
-    }
+      "Log Title": {
+        title: [{ text: { content: `${developerName} — ${bugId} — ${new Date().toLocaleDateString()}` } }],
+      },
+      Developer: {
+        rich_text: [{ text: { content: developerName } }],
+      },
+      "Session Start": {
+        date: { start: new Date().toISOString() },
+      },
+      Status: {
+        select: { name: "Active" },
+      },
+      "Task (Linked)": {
+        relation: [{ id: task.id }],
+      },
+    },
   });
+
+  console.log(`\n✅ Task "${bugId}" → In Progress`);
+  console.log(`📋 Log sheet created: ${log.id}\n`);
 
   return { taskId: task.id, logId: log.id };
 }
 
-// Mark task Done + seal log sheet
+// ─── Complete a task: mark Done + seal the log sheet ──────────────────────
 async function completeTask(bugId, logId, stats) {
-  const res = await notion.databases.query({
-    database_id: process.env.SPRINT_DB_ID,
-    filter: { property: "Bug/Feature ID", rich_text: { equals: bugId } }
-  });
+  const task = await findTask(bugId);
 
-  const task = res.results[0];
-
+  // Update task status → Done
   await notion.pages.update({
     page_id: task.id,
-    properties: { Status: { select: { name: "Done" } } }
+    properties: {
+      Status: { select: { name: "Done" } },
+    },
   });
 
+  // Seal the log sheet with final stats
   await notion.pages.update({
     page_id: logId,
     properties: {
-      "Session End": { date: { start: new Date().toISOString() } },
-      "Total Time (hrs)": { number: stats.hours },
-      "Commits": { number: stats.commits },
-      "Commit Messages": { rich_text: [{ text: { content: stats.messages.join(", ") } }] }
-    }
+      "Session End": {
+        date: { start: new Date().toISOString() },
+      },
+      "Total Time (hrs)": {
+        number: parseFloat(stats.hours.toFixed(2)),
+      },
+      "Commits Count": {
+        number: stats.commits,
+      },
+      "Commit Messages": {
+        rich_text: [{ text: { content: stats.messages.join(" | ") || "No commits recorded" } }],
+      },
+      Status: {
+        select: { name: "Completed" },
+      },
+    },
   });
+
+  console.log(`\n🎉 Task "${bugId}" → Done`);
+  console.log(`⏱  Time: ${stats.hours.toFixed(2)} hrs | Commits: ${stats.commits}\n`);
 }
 
-module.exports = { startTask, completeTask };
+// ─── Get all tasks assigned to a developer ────────────────────────────────
+async function getMyTasks(developerName) {
+  const res = await notion.databases.query({
+    database_id: process.env.SPRINT_DB_ID,
+    filter: {
+      and: [
+        { property: "Assigned To", rich_text: { equals: developerName } },
+        { property: "Status", select: { does_not_equal: "Done" } },
+      ],
+    },
+  });
+
+  return res.results.map((page) => ({
+    id: page.properties["Bug/Feature ID"]?.rich_text[0]?.text?.content || "N/A",
+    name: page.properties["Task Name"]?.title[0]?.text?.content || "Untitled",
+    status: page.properties["Status"]?.select?.name || "Unknown",
+    priority: page.properties["Priority"]?.select?.name || "Unknown",
+    sprint: page.properties["Sprint"]?.select?.name || "Unknown",
+  }));
+}
+
+module.exports = { startTask, completeTask, findTask, getMyTasks };

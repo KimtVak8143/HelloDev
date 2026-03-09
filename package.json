@@ -2,11 +2,13 @@
   "name": "xyz-tracker",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
-  "bin": { "xyz": "./src/cli/commands.js" },
+    "main": "src/server.js",
+  "bin": {
+    "xyz": "./src/cli/commands.js"
+  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "node src/server.js"
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js"
   },
   "keywords": [],
   "author": "",
