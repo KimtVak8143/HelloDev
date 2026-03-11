@@ -1,14 +1,31 @@
 const notion = require("./client");
 const logger = require("../utils/logger");
+const axios = require("axios");
 require("dotenv").config();
 
 const SPRINT_DB_ID = process.env.SPRINT_DB_ID;
 const LOGS_DB_ID   = process.env.LOGS_DB_ID;
 
+// Helper: perform a database query via HTTP directly. The official SDK has
+// an unexplained bug where using notion.request({path: ...}) produces a
+// spurious "invalid_request_url" error, so we bypass it. The implementation
+// mirrors the curl command used during troubleshooting.
+async function notionQuery(databaseId, body = {}) {
+  const url = `https://api.notion.com/v1/databases/${databaseId}/query`;
+  const response = await axios.post(url, body, {
+    headers: {
+      Authorization: `Bearer ${process.env.NOTION_API_KEY}`,
+      "Notion-Version": "2022-06-28",
+      "Content-Type": "application/json",
+    },
+  });
+  return response.data;
+}
+
 async function findTask(bugId) {
   logger.notion("Querying Sprint Board", { bugId });
-  const res = await notion.databases.query({
-    database_id: SPRINT_DB_ID,
+  // perform a direct HTTP query using the axios helper.
+  const res = await notionQuery(SPRINT_DB_ID, {
     filter: { property: "Bug/Feature ID", rich_text: { equals: bugId } }
   });
   if (!res.results.length) throw new Error(`Task "${bugId}" not found in Sprint Board.`);
@@ -76,8 +93,7 @@ async function completeTask(bugId, logId, stats) {
 
 async function listTasks(developerName) {
   logger.notion("Fetching tasks", { developer: developerName });
-  const res = await notion.databases.query({
-    database_id: SPRINT_DB_ID,
+  const res = await notionQuery(SPRINT_DB_ID, {
     filter: {
       and: [
         { property: "Assigned To", rich_text: { equals: developerName } },

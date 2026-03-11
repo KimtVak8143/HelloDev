@@ -1,28 +1,35 @@
+require("dotenv").config();
 const express  = require("express");
-const logger   = require("./utils/logger");
 const { startTask, completeTask, listTasks } = require("./notion/tasks");
 const { startTracking, stopTracking, getElapsed } = require("./trackers/timer");
 const { applyCommit } = require("./trackers/git");
-require("dotenv").config();
-
+// Add at top with other requires
+const { addLogEntry, sseHandler, logViewerPage } = require("./utils/logRelay");
+const log = require("./utils/logger");
+// Wire logger → relay (add right after requires)
+log.setRelay(addLogEntry);
 const app = express();
 app.use(express.json());
-app.use(logger.requestLogger);
+app.use(log.requestLogger);
 
 let activeSession = null;
 
-// ── GET / ─────────────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
   res.json({
-    status:  "🚀 XYZ Tracker running",
+    status:  "HelloDev Tracker running 🚀",
     session: activeSession ? {
-      bugId: activeSession.bugId, developer: activeSession.developer,
-      elapsed: `${getElapsed()} hrs`, commits: activeSession.commits.length
+      bugId:     activeSession.bugId,
+      developer: activeSession.developer,
+      elapsed:   `${getElapsed()} hrs`,
+      commits:   activeSession.commits.length
     } : null
   });
 });
 
-// ── POST /start ───────────────────────────────────────────────────────────────
+// Add these 2 routes (before /start)
+app.get("/logs",        logViewerPage);
+app.get("/logs/stream", sseHandler);
+
 app.post("/start", async (req, res) => {
   try {
     const { bugId, developer } = req.body;
@@ -32,19 +39,20 @@ app.post("/start", async (req, res) => {
       return res.status(409).json({ error: `Session already active for ${activeSession.bugId}. Run /done first.` });
 
     const { taskId, taskName, logId } = await startTask(bugId, developer);
-    activeSession = { bugId, logId, taskId, taskName, developer, startTime: Date.now(), commits: [], filesChanged: 0, linesAdded: 0, linesRemoved: 0 };
+    activeSession = { bugId, logId, taskId, taskName, developer,
+      startTime: Date.now(), commits: [], filesChanged: 0, linesAdded: 0, linesRemoved: 0 };
+
     startTracking();
-
-    logger.server("Active session created", { bugId, developer, logId });
+    log.separator();
+    log.success(`Session started — ${bugId} | Developer: ${developer}`);
+    log.separator();
     res.json({ status: "started", bugId, taskName, developer, logId, startedAt: new Date().toISOString() });
-
   } catch (err) {
-    logger.error("/start failed", { message: err.message });
+    log.error("/start failed", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// ── POST /done ────────────────────────────────────────────────────────────────
 app.post("/done", async (req, res) => {
   try {
     const { bugId } = req.body;
@@ -55,64 +63,53 @@ app.post("/done", async (req, res) => {
 
     const stats = stopTracking(activeSession);
     const { taskName } = await completeTask(bugId, activeSession.logId, stats);
+    const summary = { status: "completed", bugId, taskName,
+      developer: activeSession.developer, totalHrs: stats.hours.toFixed(2),
+      commits: stats.commits, filesChanged: stats.filesChanged,
+      linesAdded: stats.linesAdded, linesRemoved: stats.linesRemoved };
 
-    const summary = {
-      status: "completed", bugId, taskName, developer: activeSession.developer,
-      totalHrs: stats.hours.toFixed(2), commits: stats.commits,
-      filesChanged: stats.filesChanged, linesAdded: stats.linesAdded, linesRemoved: stats.linesRemoved
-    };
-
-    logger.server("Session closed", summary);
     activeSession = null;
+    log.separator();
+    log.success(`Session complete — ${bugId} | ${stats.hours.toFixed(2)} hrs | ${stats.commits} commits`);
+    log.separator();
     res.json(summary);
-
   } catch (err) {
-    logger.error("/done failed", { message: err.message });
+    log.error("/done failed", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// ── POST /commit ──────────────────────────────────────────────────────────────
 app.post("/commit", (req, res) => {
   if (!activeSession) {
-    logger.warn("Commit received with no active session");
+    log.warn("Commit received with no active session — ignored");
     return res.json({ ok: true, note: "No active session, commit ignored" });
   }
   applyCommit(activeSession, req.body);
   res.json({ ok: true, commits: activeSession.commits.length, latest: req.body.message });
 });
 
-// ── GET /status ───────────────────────────────────────────────────────────────
 app.get("/status", (req, res) => {
-  if (!activeSession) return res.json({ active: false, message: "No session running" });
-  res.json({
-    active: true, bugId: activeSession.bugId, taskName: activeSession.taskName,
-    developer: activeSession.developer, elapsed: `${getElapsed()} hrs`, commits: activeSession.commits.length
-  });
+  if (!activeSession)
+    return res.json({ active: false, message: "No session running" });
+  res.json({ active: true, bugId: activeSession.bugId, taskName: activeSession.taskName,
+    developer: activeSession.developer, elapsed: `${getElapsed()} hrs`, commits: activeSession.commits.length });
 });
 
-// ── GET /tasks/:developer ─────────────────────────────────────────────────────
 app.get("/tasks/:developer", async (req, res) => {
   try {
     const tasks = await listTasks(req.params.developer);
     res.json({ developer: req.params.developer, tasks });
   } catch (err) {
-    logger.error("/tasks failed", { message: err.message });
+    log.error("/tasks failed", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// ── Start ─────────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3333;
 app.listen(PORT, () => {
-  logger.section("XYZ Tracker Server");
-  logger.server(`Running on http://localhost:${PORT}`);
-  logger.server(`Log file → ${logger.logFile}`);
-  logger.info("Available endpoints:");
-  logger.debug("  GET  /              → health check");
-  logger.debug("  POST /start         → start tracking");
-  logger.debug("  POST /done          → complete task");
-  logger.debug("  POST /commit        → log git commit");
-  logger.debug("  GET  /status        → session info");
-  logger.debug("  GET  /tasks/:dev    → list tasks\n");
+  log.banner();
+  log.separator("Server Ready");
+  log.info(`Listening on http://localhost:${PORT}`);
+  log.info(`LOG_LEVEL: ${process.env.LOG_LEVEL || "INFO"}`);
+  log.separator();
 });

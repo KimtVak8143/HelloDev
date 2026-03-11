@@ -1,4 +1,4 @@
-// ─── XYZ Logger ───────────────────────────────────────────────────────────────
+// ─── HelloDev Logger ─────────────────────────────────────────────────────────────
 // Colored, leveled, timestamped logger for smooth dev & debug experience
 // Levels: DEBUG < INFO < SUCCESS < WARN < ERROR
 // Usage:
@@ -73,15 +73,29 @@ function formatExtra(extra) {
 }
 
 // ─── Core log function ────────────────────────────────────────────────────────
+let _relay = null; // optional relay callback
+
+function setRelay(fn) {
+  _relay = typeof fn === 'function' ? fn : null;
+}
+
 function log(level, color, icon, message, extra) {
   if (LEVELS[level] < LEVELS[LOG_LEVEL]) return;
 
-  const line = `${timestamp()} ${icon} ${label(level, color)} ${message}${formatExtra(extra)}`;
+  const time = timestamp();
+  const line = `${time} ${icon} ${label(level, color)} ${message}${formatExtra(extra)}`;
   
   if (level === "ERROR") {
     process.stderr.write(line + "\n");
   } else {
     process.stdout.write(line + "\n");
+  }
+
+  // forward to relay if configured (strip ANSI codes)
+  if (_relay) {
+    const stripped = line.replace(/\x1b\[[0-9;]*m/g, "");
+    try { _relay({ level, timestamp: time, message: stripped, extra }); }
+    catch (e) { /* swallow relay errors */ }
   }
 }
 
@@ -97,17 +111,24 @@ function separator(title = "") {
   }
 }
 
+// ─── Section helper (alias for separator with title) ──────────────────────────
+function section(title) {
+  separator(title);
+}
+
 // ─── Banner ───────────────────────────────────────────────────────────────────
 function banner() {
+  // small ASCII banner for HelloDev
   console.log(`
 ${C.cyan}${C.bold}
-  ██╗  ██╗██╗   ██╗███████╗
-  ╚██╗██╔╝╚██╗ ██╔╝╚══███╔╝
-   ╚███╔╝  ╚████╔╝   ███╔╝ 
-   ██╔██╗   ╚██╔╝   ███╔╝  
-  ██╔╝ ██╗   ██║   ███████╗
-  ╚═╝  ╚═╝   ╚═╝   ╚══════╝
-${C.reset}${C.dim}  Agentic Sprint Tracker — Powered by Notion MCP${C.reset}
+ #     #                             ######                
+ #     # ###### #      #       ####  #     # ###### #    # 
+ #     # #      #      #      #    # #     # #      #    # 
+ ####### #####  #      #      #    # #     # #####  #    # 
+ #     # #      #      #      #    # #     # #      #    # 
+ #     # ###### ###### ######  ####  ######  ######   ##   
+                                                           
+${C.reset}${C.dim}  HelloDev Tracker — coding time & commits synced to Notion${C.reset}
 `);
 }
 
@@ -134,13 +155,18 @@ function requestLogger(req, res, next) {
 }
 
 // ─── Notion-specific logger ───────────────────────────────────────────────────
-const notion = {
-  query:   (db, filter)  => log("DEBUG", C.magenta, ICONS.NOTION, `Query DB: ${db}`, filter),
-  update:  (pageId, msg) => log("DEBUG", C.magenta, ICONS.NOTION, `Update page ${pageId}: ${msg}`),
-  create:  (db, title)   => log("DEBUG", C.magenta, ICONS.NOTION, `Create in ${db}: "${title}"`),
-  success: (msg)         => log("SUCCESS", C.green, ICONS.NOTION, msg),
-  error:   (msg, err)    => log("ERROR", C.red, ICONS.NOTION, msg, err),
-};
+function notionLogger(msg, extra) {
+  log("DEBUG", C.magenta, ICONS.NOTION, msg, extra);
+}
+
+// add helper methods on the function
+notionLogger.query = (db, filter) => notionLogger(`Query DB: ${db}`, filter);
+notionLogger.update = (pageId, msg) => notionLogger(`Update page ${pageId}: ${msg}`);
+notionLogger.create = (db, title) => notionLogger(`Create in ${db}: "${title}"`);
+notionLogger.success = (msg) => log("SUCCESS", C.green, ICONS.NOTION, msg);
+notionLogger.error = (msg, err) => log("ERROR", C.red, ICONS.NOTION, msg, err);
+
+const notion = notionLogger;
 
 // ─── Git-specific logger ──────────────────────────────────────────────────────
 const git = {
@@ -155,6 +181,17 @@ const timer = {
   idle:    (mins)       => log("DEBUG", C.yellow, ICONS.TIMER, `Idle detected: ${mins} min`),
 };
 
+// also provide a generic timer function for legacy callers that simply
+// passed a message; this keeps older modules working without modification
+function timerFn(msg, extra) {
+  log("INFO", C.yellow, ICONS.TIMER, msg, extra);
+}
+// expose the structured helpers as properties
+timerFn.start = timer.start;
+timerFn.stop  = timer.stop;
+ timerFn.idle = timer.idle;
+
+
 // ─── Exports ──────────────────────────────────────────────────────────────────
 module.exports = {
   debug:   (msg, extra) => log("DEBUG",   C.cyan,    ICONS.DEBUG,   msg, extra),
@@ -166,10 +203,16 @@ module.exports = {
   // Domain-specific loggers
   notion,
   git,
-  timer,
+  // timer exported as a function with helpers attached; legacy code used
+  // logger.timer(msg) while newer code can call logger.timer.start/stop/idle
+  timer: timerFn,
 
   // Utilities
   separator,
+  section,
   banner,
   requestLogger,
+
+  // relay support
+  setRelay,
 };

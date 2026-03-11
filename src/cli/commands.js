@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// ─── XYZ CLI ──────────────────────────────────────────────────────────────
+// ─── HelloDev CLI ───────────────────────────────────────────────────────────
 // Usage:
-//   xyz start bug-#1 --dev Alice
-//   xyz done bug-#1
-//   xyz status
-//   xyz tasks Alice
+//   hellodev start bug-#1 --dev Alice
+//   hellodev done bug-#1
+//   hellodev status
+//   hellodev tasks Alice
 
 const axios = require("axios");
 require("dotenv").config();
@@ -23,14 +23,14 @@ const colors = {
 
 (async () => {
   try {
-    // ── xyz start bug-#1 --dev Alice ──
+    // ── hellodev start bug-#1 --dev Alice ──
     if (action === "start") {
       const bugId = args[1];
       const devIndex = args.indexOf("--dev");
       const developer = devIndex !== -1 ? args[devIndex + 1] : null;
 
       if (!bugId || !developer) {
-        console.log(colors.red("Usage: xyz start <bug-id> --dev <developer-name>"));
+        console.log(colors.red("Usage: hellodev start <bug-id> --dev <developer-name>"));
         process.exit(1);
       }
 
@@ -39,12 +39,12 @@ const colors = {
       console.log(colors.cyan(`Log ID: ${data.logId}\n`));
     }
 
-    // ── xyz done bug-#1 ──
+    // ── hellodev done bug-#1 ──
     else if (action === "done") {
       const bugId = args[1];
 
       if (!bugId) {
-        console.log(colors.red("Usage: xyz done <bug-id>"));
+        console.log(colors.red("Usage: hellodev done <bug-id>"));
         process.exit(1);
       }
 
@@ -53,7 +53,7 @@ const colors = {
       console.log(colors.cyan(`⏱  Time: ${data.totalTime} | Commits: ${data.commits}\n`));
     }
 
-    // ── xyz status ──
+    // ── hellodev status ──
     else if (action === "status") {
       const { data } = await axios.get(`${BASE}/status`);
 
@@ -72,12 +72,12 @@ const colors = {
       }
     }
 
-    // ── xyz tasks Alice ──
+    // ── hellodev tasks Alice ──
     else if (action === "tasks") {
       const developer = args[1];
 
       if (!developer) {
-        console.log(colors.red("Usage: xyz tasks <developer-name>"));
+        console.log(colors.red("Usage: hellodev tasks <developer-name>"));
         process.exit(1);
       }
 
@@ -97,16 +97,16 @@ const colors = {
 
     // ── Help ──
     else {
-      console.log(colors.bold("\n🚀 XYZ Tracker CLI"));
+      console.log(colors.bold("\n🚀 HelloDev Tracker CLI"));
       console.log("─────────────────────────────────");
-      console.log(`  ${colors.cyan("xyz start <bug-id> --dev <name>")}  Start tracking a task`);
-      console.log(`  ${colors.cyan("xyz done <bug-id>")}                Mark task complete`);
-      console.log(`  ${colors.cyan("xyz status")}                       Show active session`);
-      console.log(`  ${colors.cyan("xyz tasks <developer-name>")}       View pending tasks\n`);
+      console.log(`  ${colors.cyan("hellodev start <bug-id> --dev <name>")}  Start tracking a task`);
+      console.log(`  ${colors.cyan("hellodev done <bug-id>")}                Mark task complete`);
+      console.log(`  ${colors.cyan("hellodev status")}                       Show active session`);
+      console.log(`  ${colors.cyan("hellodev tasks <developer-name>")}       View pending tasks\n`);
     }
   } catch (err) {
     if (err.code === "ECONNREFUSED") {
-      console.log(colors.red("\n❌ XYZ Server is not running!"));
+      console.log(colors.red("\n❌ HelloDev Server is not running!"));
       console.log(colors.yellow("   Start it with: node src/server.js\n"));
     } else {
       console.log(colors.red(`\n❌ Error: ${err.response?.data?.error || err.message}\n`));
