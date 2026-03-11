@@ -9,8 +9,26 @@ const log = require("./utils/logger");
 // Wire logger → relay (add right after requires)
 log.setRelay(addLogEntry);
 const app = express();
-app.use(express.json());
+
+// Capture raw body using standard Express middleware that stores it
+app.use(express.json({ 
+  verify: (req, res, buf, encoding) => {
+    req.rawBody = buf.toString(encoding || 'utf8');
+  }
+}));
 app.use(log.requestLogger);
+
+// JSON parsing error handler - catches SyntaxErrors from express.json()
+app.use((err, req, res, next) => {
+  if (err && (err instanceof SyntaxError || err.message.includes('JSON'))) {
+    log.error('Malformed JSON in request', {
+      message: err.message,
+      rawBody: req.rawBody ? req.rawBody.substring(0, 150) : 'N/A'
+    });
+    return res.status(400).json({ error: 'Malformed JSON: ' + err.message });
+  }
+  next(err);
+});
 
 let activeSession = null;
 
