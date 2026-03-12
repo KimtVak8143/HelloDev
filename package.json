@@ -18,7 +18,7 @@
   "license": "ISC",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1",
-    "@notionhq/client": "2.2.15",
+    "@notionhq/client": "^2.2.15",
     "axios": "^1.13.6",
     "chokidar": "^5.0.0",
     "dotenv": "^17.3.1",
