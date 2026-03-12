@@ -22,7 +22,7 @@ function applyCommit(session, payload) {
 
   recordActivity();
 
-  logger.git(`Commit #${session.commits.length} logged`, {
+  logger.info(`Commit #${session.commits.length} logged`, {
     message:      stats.message,
     filesChanged: stats.filesChanged,
     linesAdded:   stats.linesAdded,

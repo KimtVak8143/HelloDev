@@ -7,10 +7,10 @@
     "hellodev": "./src/cli/commands.js"
   },
   "scripts": {
-    "start":           "node src/server.js",
-    "dev":             "nodemon src/server.js",
-    "mcp":             "node src/mcp/index.js",
-    "all":         "concurrently \"npm run dev\" \"npm run mcp\"",
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "mcp": "node src/mcp/index.js",
+    "all": "concurrently \"npm run dev\" \"npm run mcp\"",
     "test-connection": "node test-connection.js"
   },
   "keywords": [],
@@ -23,6 +23,7 @@
     "chokidar": "^5.0.0",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
+    "pino": "^10.3.1",
     "simple-git": "^3.32.3",
     "swagger-ui-express": "^5.0.1",
     "yamljs": "^0.3.0",

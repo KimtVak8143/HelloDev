@@ -3,11 +3,7 @@ const express  = require("express");
 const { startTask, completeTask, listTasks } = require("./notion/tasks");
 const { startTracking, stopTracking, getElapsed } = require("./trackers/timer");
 const { applyCommit } = require("./trackers/git");
-// Add at top with other requires
-const { addLogEntry, sseHandler, logViewerPage } = require("./utils/logRelay");
 const log = require("./utils/logger");
-// Wire logger → relay (add right after requires)
-log.setRelay(addLogEntry);
 const app = express();
 
 // Capture raw body using standard Express middleware that stores it
@@ -44,9 +40,7 @@ app.get("/", (req, res) => {
   });
 });
 
-// Add these 2 routes (before /start)
-app.get("/logs",        logViewerPage);
-app.get("/logs/stream", sseHandler);
+
 
 app.post("/start", async (req, res) => {
   try {
