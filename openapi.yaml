@@ -1,0 +1,473 @@
+openapi: 3.0.3
+info:
+  title: HelloDev Sprint Tracker API
+  description: |
+    Agentic Sprint Tracker powered by Notion MCP.
+
+    ## How it works
+    1. **Manager** sets up tasks in Notion Sprint Board
+    2. **Developer** starts the HelloDev local server
+    3. Developer runs `hellodev start bug-#1 --dev Alice` → task marked In Progress in Notion
+    4. Git commits are auto-logged via post-commit hook
+    5. Developer runs `hellodev done bug-#1` → task marked Done, activity log sealed
+    6. Manager sees live sprint status in Notion — no standups needed
+
+    ## Log Levels
+    Set `LOG_LEVEL` in `.env` to control verbosity:
+    - `DEBUG` — all Notion API calls visible
+    - `INFO`  — normal dev mode (default)
+    - `ERROR` — silent/production mode
+  version: 1.0.0
+  contact:
+    name: HelloDev Tracker
+
+servers:
+  - url: http://localhost:3333
+    description: Local development server
+
+tags:
+  - name: Health
+    description: Server health and status
+  - name: Session
+    description: Start and complete developer task sessions
+  - name: Git
+    description: Git commit tracking
+  - name: Tasks
+    description: Notion Sprint Board task queries
+
+paths:
+  /:
+    get:
+      tags: [Health]
+      summary: Server health check
+      description: Returns server status and active session info if any.
+      responses:
+        '200':
+          description: Server is running
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "HelloDev Tracker running 🚀"
+                  session:
+                    nullable: true
+                    $ref: '#/components/schemas/SessionSummary'
+              examples:
+                no_session:
+                  summary: No active session
+                  value:
+                    status: "HelloDev Tracker running 🚀"
+                    session: null
+                active_session:
+                  summary: Session in progress
+                  value:
+                    status: "HelloDev Tracker running 🚀"
+                    session:
+                      bugId: "bug-#1"
+                      developer: "Alice"
+                      elapsed: "0.25 hrs"
+                      commits: 2
+
+  /start:
+    post:
+      tags: [Session]
+      summary: Start tracking a task
+      description: |
+        Begins a developer work session for the given task.
+        - Marks the Notion task as **In Progress**
+        - Creates a linked **Activity Log** sheet
+        - Starts the coding time tracker
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartRequest'
+            example:
+              bugId: "bug-#1"
+              developer: "Alice"
+      responses:
+        '200':
+          description: Session started successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StartResponse'
+              example:
+                status: "started"
+                bugId: "bug-#1"
+                taskName: "Fix login bug"
+                developer: "Alice"
+                logId: "abc123-def456-789"
+                startedAt: "2025-03-10T08:00:00.000Z"
+        '400':
+          description: Missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "bugId and developer are required"
+        '409':
+          description: Session already active
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Session already active for bug-#1. Run /done first."
+        '500':
+          description: Notion API error or task not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Task \"bug-#99\" not found in Sprint Board"
+
+  /done:
+    post:
+      tags: [Session]
+      summary: Complete the active task
+      description: |
+        Ends the current developer work session.
+        - Marks the Notion task as **Done**
+        - Seals the Activity Log with final stats:
+          - Total active coding time
+          - Commit count and messages
+          - Files changed, lines added/removed
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DoneRequest'
+            example:
+              bugId: "bug-#1"
+      responses:
+        '200':
+          description: Task completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DoneResponse'
+              example:
+                status: "completed"
+                bugId: "bug-#1"
+                taskName: "Fix login bug"
+                developer: "Alice"
+                totalHrs: "1.25"
+                commits: 3
+                filesChanged: 5
+                linesAdded: 120
+                linesRemoved: 45
+        '400':
+          description: No active session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "No active session. Use /start first."
+        '409':
+          description: Bug ID mismatch with active session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Active session is for bug-#1, not bug-#2"
+
+  /status:
+    get:
+      tags: [Session]
+      summary: Get current session status
+      description: Returns live info about the active developer session including elapsed time and commit count.
+      responses:
+        '200':
+          description: Session status
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ActiveStatus'
+                  - $ref: '#/components/schemas/InactiveStatus'
+              examples:
+                active:
+                  summary: Session is running
+                  value:
+                    active: true
+                    bugId: "bug-#1"
+                    taskName: "Fix login bug"
+                    developer: "Alice"
+                    elapsed: "0.50 hrs"
+                    commits: 2
+                inactive:
+                  summary: No session running
+                  value:
+                    active: false
+                    message: "No session running"
+
+  /commit:
+    post:
+      tags: [Git]
+      summary: Log a git commit
+      description: |
+        Records a git commit to the active session's activity log.
+        
+        **Automatically called** by the `hooks/post-commit` git hook on every `git commit`.
+        Can also be called manually for testing.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommitRequest'
+            example:
+              message: "fix: resolve null pointer in login handler"
+              filesChanged: 3
+              linesAdded: 45
+              linesRemoved: 12
+      responses:
+        '200':
+          description: Commit logged (or ignored if no active session)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommitResponse'
+              examples:
+                logged:
+                  summary: Commit recorded
+                  value:
+                    ok: true
+                    commits: 3
+                    latest: "fix: resolve null pointer in login handler"
+                ignored:
+                  summary: No active session
+                  value:
+                    ok: true
+                    note: "No active session, commit ignored"
+
+  /tasks/{developer}:
+    get:
+      tags: [Tasks]
+      summary: List tasks for a developer
+      description: Fetches all non-completed tasks assigned to a developer from the Notion Sprint Board.
+      parameters:
+        - name: developer
+          in: path
+          required: true
+          schema:
+            type: string
+          example: Alice
+          description: Developer's name exactly as it appears in Notion "Assigned To" field
+      responses:
+        '200':
+          description: Task list returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskListResponse'
+              examples:
+                with_tasks:
+                  summary: Tasks found
+                  value:
+                    developer: "Alice"
+                    tasks:
+                      - id: "bug-#1"
+                        name: "Fix login bug"
+                        status: "Todo"
+                        priority: "High"
+                        points: 3
+                      - id: "chore-#3"
+                        name: "Write unit tests"
+                        status: "In Progress"
+                        priority: "Low"
+                        points: 2
+                no_tasks:
+                  summary: No pending tasks
+                  value:
+                    developer: "Alice"
+                    tasks: []
+        '500':
+          description: Notion API error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    StartRequest:
+      type: object
+      required: [bugId, developer]
+      properties:
+        bugId:
+          type: string
+          description: The Bug/Feature ID from Notion Sprint Board
+          example: "bug-#1"
+        developer:
+          type: string
+          description: Developer's name (must match Notion "Assigned To")
+          example: "Alice"
+
+    StartResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "started"
+        bugId:
+          type: string
+          example: "bug-#1"
+        taskName:
+          type: string
+          example: "Fix login bug"
+        developer:
+          type: string
+          example: "Alice"
+        logId:
+          type: string
+          description: Notion page ID of the created Activity Log
+          example: "abc123-def456"
+        startedAt:
+          type: string
+          format: date-time
+
+    DoneRequest:
+      type: object
+      required: [bugId]
+      properties:
+        bugId:
+          type: string
+          example: "bug-#1"
+
+    DoneResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "completed"
+        bugId:
+          type: string
+        taskName:
+          type: string
+        developer:
+          type: string
+        totalHrs:
+          type: string
+          example: "1.25"
+        commits:
+          type: integer
+        filesChanged:
+          type: integer
+        linesAdded:
+          type: integer
+        linesRemoved:
+          type: integer
+
+    CommitRequest:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          example: "fix: resolve null pointer in login handler"
+        filesChanged:
+          type: integer
+          example: 3
+        linesAdded:
+          type: integer
+          example: 45
+        linesRemoved:
+          type: integer
+          example: 12
+
+    CommitResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        commits:
+          type: integer
+        latest:
+          type: string
+        note:
+          type: string
+
+    SessionSummary:
+      type: object
+      properties:
+        bugId:
+          type: string
+        developer:
+          type: string
+        elapsed:
+          type: string
+        commits:
+          type: integer
+
+    ActiveStatus:
+      type: object
+      properties:
+        active:
+          type: boolean
+          example: true
+        bugId:
+          type: string
+        taskName:
+          type: string
+        developer:
+          type: string
+        elapsed:
+          type: string
+        commits:
+          type: integer
+
+    InactiveStatus:
+      type: object
+      properties:
+        active:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: "No session running"
+
+    TaskListResponse:
+      type: object
+      properties:
+        developer:
+          type: string
+        tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/Task'
+
+    Task:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "bug-#1"
+        name:
+          type: string
+          example: "Fix login bug"
+        status:
+          type: string
+          enum: [Todo, In Progress, Done, Blocked]
+        priority:
+          type: string
+          enum: [High, Medium, Low]
+        points:
+          type: integer
+          example: 3
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string

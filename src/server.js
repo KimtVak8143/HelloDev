@@ -1,163 +1,127 @@
-const express = require("express");
-const { startTask, completeTask, getMyTasks } = require("./notion/tasks");
-const { startTracking, stopTracking, getElapsed } = require("./trackers/timer");
 require("dotenv").config();
-
+const express  = require("express");
+const { startTask, completeTask, listTasks } = require("./notion/tasks");
+const { startTracking, stopTracking, getElapsed } = require("./trackers/timer");
+const { applyCommit } = require("./trackers/git");
+const log = require("./utils/logger");
 const app = express();
-app.use(express.json());
 
-// ─── Active Session State ─────────────────────────────────────────────────
+// Capture raw body using standard Express middleware that stores it
+app.use(express.json({ 
+  verify: (req, res, buf, encoding) => {
+    req.rawBody = buf.toString(encoding || 'utf8');
+  }
+}));
+app.use(log.requestLogger);
+
+// JSON parsing error handler - catches SyntaxErrors from express.json()
+app.use((err, req, res, next) => {
+  if (err && (err instanceof SyntaxError || err.message.includes('JSON'))) {
+    log.error('Malformed JSON in request', {
+      message: err.message,
+      rawBody: req.rawBody ? req.rawBody.substring(0, 150) : 'N/A'
+    });
+    return res.status(400).json({ error: 'Malformed JSON: ' + err.message });
+  }
+  next(err);
+});
+
 let activeSession = null;
-// activeSession = { bugId, logId, taskId, developer, startTime, commits: [] }
 
-// ─── Health Check ─────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
   res.json({
-    status: "🚀 XYZ Tracker running",
-    activeSession: activeSession
-      ? {
-          bugId: activeSession.bugId,
-          developer: activeSession.developer,
-          elapsed: getElapsed(),
-          commits: activeSession.commits.length,
-        }
-      : null,
+    status:  "HelloDev Tracker running 🚀",
+    session: activeSession ? {
+      bugId:     activeSession.bugId,
+      developer: activeSession.developer,
+      elapsed:   `${getElapsed()} hrs`,
+      commits:   activeSession.commits.length
+    } : null
   });
 });
 
-// ─── POST /start ──────────────────────────────────────────────────────────
-// Body: { bugId: "bug-#1", developer: "Alice" }
+
+
 app.post("/start", async (req, res) => {
   try {
     const { bugId, developer } = req.body;
-
-    if (!bugId || !developer) {
+    if (!bugId || !developer)
       return res.status(400).json({ error: "bugId and developer are required" });
-    }
+    if (activeSession)
+      return res.status(409).json({ error: `Session already active for ${activeSession.bugId}. Run /done first.` });
 
-    if (activeSession) {
-      return res.status(400).json({
-        error: `Already tracking "${activeSession.bugId}". Run /done first.`,
-      });
-    }
-
-    const { taskId, logId } = await startTask(bugId, developer);
-
-    activeSession = {
-      bugId,
-      logId,
-      taskId,
-      developer,
-      startTime: Date.now(),
-      commits: [],
-    };
+    const { taskId, taskName, logId } = await startTask(bugId, developer);
+    activeSession = { bugId, logId, taskId, taskName, developer,
+      startTime: Date.now(), commits: [], filesChanged: 0, linesAdded: 0, linesRemoved: 0 };
 
     startTracking();
-
-    res.json({
-      status: "started",
-      bugId,
-      developer,
-      logId,
-      message: `✅ Now tracking "${bugId}" for ${developer}`,
-    });
+    log.separator();
+    log.success(`Session started — ${bugId} | Developer: ${developer}`);
+    log.separator();
+    res.json({ status: "started", bugId, taskName, developer, logId, startedAt: new Date().toISOString() });
   } catch (err) {
-    console.error("❌ /start error:", err.message);
+    log.error("/start failed", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// ─── POST /done ───────────────────────────────────────────────────────────
-// Body: { bugId: "bug-#1" }
 app.post("/done", async (req, res) => {
   try {
     const { bugId } = req.body;
-
-    if (!activeSession) {
+    if (!activeSession)
       return res.status(400).json({ error: "No active session. Use /start first." });
-    }
-
-    if (activeSession.bugId !== bugId) {
-      return res.status(400).json({
-        error: `Active session is for "${activeSession.bugId}", not "${bugId}"`,
-      });
-    }
+    if (activeSession.bugId !== bugId)
+      return res.status(409).json({ error: `Active session is for ${activeSession.bugId}, not ${bugId}` });
 
     const stats = stopTracking(activeSession);
-    await completeTask(bugId, activeSession.logId, stats);
-
-    const summary = {
-      status: "completed",
-      bugId,
-      developer: activeSession.developer,
-      totalTime: `${stats.hours.toFixed(2)} hrs`,
-      commits: stats.commits,
-      message: `🎉 "${bugId}" marked as Done!`,
-    };
+    const { taskName } = await completeTask(bugId, activeSession.logId, stats);
+    const summary = { status: "completed", bugId, taskName,
+      developer: activeSession.developer, totalHrs: stats.hours.toFixed(2),
+      commits: stats.commits, filesChanged: stats.filesChanged,
+      linesAdded: stats.linesAdded, linesRemoved: stats.linesRemoved };
 
     activeSession = null;
+    log.separator();
+    log.success(`Session complete — ${bugId} | ${stats.hours.toFixed(2)} hrs | ${stats.commits} commits`);
+    log.separator();
     res.json(summary);
   } catch (err) {
-    console.error("❌ /done error:", err.message);
+    log.error("/done failed", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// ─── POST /commit ─────────────────────────────────────────────────────────
-// Called automatically by git post-commit hook
-// Body: { message: "fix: resolved login bug" }
 app.post("/commit", (req, res) => {
   if (!activeSession) {
-    return res.json({ ok: false, reason: "No active session" });
+    log.warn("Commit received with no active session — ignored");
+    return res.json({ ok: true, note: "No active session, commit ignored" });
   }
-
-  const { message } = req.body;
-  activeSession.commits.push(message);
-
-  console.log(`📝 Commit #${activeSession.commits.length}: ${message}`);
-  res.json({ ok: true, totalCommits: activeSession.commits.length });
+  applyCommit(activeSession, req.body);
+  res.json({ ok: true, commits: activeSession.commits.length, latest: req.body.message });
 });
 
-// ─── GET /status ──────────────────────────────────────────────────────────
 app.get("/status", (req, res) => {
-  if (!activeSession) {
-    return res.json({ active: false, message: "No task in progress" });
-  }
-
-  res.json({
-    active: true,
-    bugId: activeSession.bugId,
-    developer: activeSession.developer,
-    elapsed: getElapsed(),
-    commits: activeSession.commits.length,
-    commitMessages: activeSession.commits,
-  });
+  if (!activeSession)
+    return res.json({ active: false, message: "No session running" });
+  res.json({ active: true, bugId: activeSession.bugId, taskName: activeSession.taskName,
+    developer: activeSession.developer, elapsed: `${getElapsed()} hrs`, commits: activeSession.commits.length });
 });
 
-// ─── GET /tasks/:developer ────────────────────────────────────────────────
-// Get all pending tasks for a developer
 app.get("/tasks/:developer", async (req, res) => {
   try {
-    const tasks = await getMyTasks(req.params.developer);
+    const tasks = await listTasks(req.params.developer);
     res.json({ developer: req.params.developer, tasks });
   } catch (err) {
+    log.error("/tasks failed", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// ─── Start Server ─────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3333;
 app.listen(PORT, () => {
-  console.log(`
-╔══════════════════════════════════════╗
-║       🚀 XYZ Tracker Server          ║
-║       Running on port ${PORT}          ║
-╠══════════════════════════════════════╣
-║  POST /start   → begin task tracking ║
-║  POST /done    → complete task       ║
-║  POST /commit  → log git commit      ║
-║  GET  /status  → current session     ║
-║  GET  /tasks/:dev → view my tasks    ║
-╚══════════════════════════════════════╝
-  `);
+  log.banner();
+  log.separator("Server Ready");
+  log.info(`Listening on http://localhost:${PORT}`);
+  log.info(`LOG_LEVEL: ${process.env.LOG_LEVEL || "INFO"}`);
+  log.separator();
 });
