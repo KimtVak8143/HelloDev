@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// ─── XYZ MCP Server ───────────────────────────────────────────────────────────
-// Exposes XYZ Sprint Tracker as MCP tools for Copilot / Claude in VSCode
+// ─── HelloDev MCP Server ───────────────────────────────────────────────────────────
+// Exposes HelloDev Sprint Tracker as MCP tools for Copilot / Claude in VSCode
 // Developer can chat naturally instead of memorizing CLI commands
 //
 // Tools exposed:
@@ -18,8 +18,8 @@ const axios            = require("axios");
 
 const BASE = `http://localhost:${process.env.PORT || 3333}`;
 
-// ─── Helper: call XYZ Express server ─────────────────────────────────────────
-async function callXYZ(method, path, body = null) {
+// ─── Helper: call HelloDev Express server ─────────────────────────────────────────
+async function callHelloDev(method, path, body = null) {
   try {
     const res = method === "get"
       ? await axios.get(`${BASE}${path}`)
@@ -28,7 +28,7 @@ async function callXYZ(method, path, body = null) {
   } catch (err) {
     const msg = err.response?.data?.error || err.message;
     if (err.code === "ECONNREFUSED") {
-      return { ok: false, error: "XYZ server is not running. Please start it with: npm run dev" };
+      return { ok: false, error: "HelloDev server is not running. Please start it with: npm run dev" };
     }
     return { ok: false, error: msg };
   }
@@ -40,7 +40,7 @@ function text(content) {
 
 // ─── Create MCP Server ────────────────────────────────────────────────────────
 const server = new McpServer({
-  name:    "xyz-sprint-tracker",
+  name:    "HelloDev-tracker",
   version: "1.0.0",
 });
 
@@ -52,7 +52,7 @@ server.tool(
     developer: z.string().describe("Developer name e.g. Alice, Bob")
   },
   async ({ developer }) => {
-    const result = await callXYZ("get", `/tasks/${developer}`);
+    const result = await callHelloDev("get", `/tasks/${developer}`);
     if (!result.ok) return text(`❌ ${result.error}`);
 
     const { tasks } = result.data;
@@ -75,7 +75,7 @@ server.tool(
     developer: z.string().describe("Developer name e.g. Alice")
   },
   async ({ bug_id, developer }) => {
-    const result = await callXYZ("post", "/start", { bugId: bug_id, developer });
+    const result = await callHelloDev("post", "/start", { bugId: bug_id, developer });
     if (!result.ok) return text(`❌ ${result.error}`);
 
     const { taskName, logId, startedAt } = result.data;
@@ -100,7 +100,7 @@ server.tool(
     bug_id: z.string().describe("Bug or Feature ID e.g. bug-#1")
   },
   async ({ bug_id }) => {
-    const result = await callXYZ("post", "/done", { bugId: bug_id });
+    const result = await callHelloDev("post", "/done", { bugId: bug_id });
     if (!result.ok) return text(`❌ ${result.error}`);
 
     const { taskName, developer, totalHrs, commits, filesChanged, linesAdded, linesRemoved } = result.data;
@@ -126,7 +126,7 @@ server.tool(
   "Get the current active session — elapsed time, commits, which task is being worked on",
   {},
   async () => {
-    const result = await callXYZ("get", "/status");
+    const result = await callHelloDev("get", "/status");
     if (!result.ok) return text(`❌ ${result.error}`);
 
     const data = result.data;
@@ -153,12 +153,12 @@ server.tool(
     developer: z.string().optional().describe("Filter by developer name (optional)")
   },
   async ({ developer }) => {
-    const result = await callXYZ("get", "/");
+    const result = await callHelloDev("get", "/");
     if (!result.ok) return text(`❌ ${result.error}`);
 
     // Also get tasks if developer provided
     if (developer) {
-      const tasks = await callXYZ("get", `/tasks/${developer}`);
+      const tasks = await callHelloDev("get", `/tasks/${developer}`);
       if (!tasks.ok) return text(`❌ ${tasks.error}`);
 
       const list = tasks.data.tasks;
@@ -173,7 +173,7 @@ server.tool(
 
     const session = result.data.session;
     return text(
-      `🚀 XYZ Sprint Tracker\n\n` +
+      `🚀 HelloDev Sprint Tracker\n\n` +
       `Server: Running on port ${process.env.PORT || 3333}\n\n` +
       (session
         ? `Active Session:\n  ${session.developer} → ${session.bugId} | ${session.elapsed} | ${session.commits} commits`
@@ -187,7 +187,7 @@ server.tool(
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("✅ XYZ MCP Server running — waiting for tool calls...");
+  console.error("✅ HelloDev MCP Server running — waiting for tool calls...");
 }
 
 main().catch(err => {
