@@ -1,6 +1,5 @@
 "use strict";
 
-const vscode = require("vscode");
 const { createRuntimeState } = require("./runtime/state");
 const { startMcpHost, stopMcpHost } = require("./mcp/host");
 const { createOutput } = require("./utils/output");

@@ -6,9 +6,9 @@
 //   log.debug("Debug info", { key: "value" });
 //   log.error("Error occurred", err);
 
-const pino = require('pino');
+const pino = require("pino");
 
-const LOG_LEVEL = process.env.LOG_LEVEL || 'info';
+const LOG_LEVEL = process.env.LOG_LEVEL || "info";
 
 // Create pino logger instance
 const baseLogger = pino({ level: LOG_LEVEL.toLowerCase() });
@@ -18,17 +18,17 @@ function requestLogger(req, res, next) {
   const start = Date.now();
   const { method, url } = req;
   
-  res.on('finish', () => {
+  res.on("finish", () => {
     const duration = Date.now() - start;
-    baseLogger.info({ method, url, status: res.statusCode, duration, module: 'http' }, `${method} ${url}`);
+    baseLogger.info({ method, url, status: res.statusCode, duration, module: "http" }, `${method} ${url}`);
   });
   
   next();
 }
 
 // ─── Separator ────────────────────────────────────────────────────────────
-function separator(title = '') {
-  const line = '─'.repeat(50);
+function separator(title = "") {
+  const line = "─".repeat(50);
   if (title) {
     baseLogger.info(`\n${line}`);
     baseLogger.info(`  ${title}`);
@@ -60,33 +60,33 @@ function banner() {
 
 // ─── Notion-specific logger ───────────────────────────────────────────────
 function notionLogger(msg, extra) {
-  baseLogger.debug({ module: 'notion', ...extra }, msg);
+  baseLogger.debug({ module: "notion", ...extra }, msg);
 }
 
 notionLogger.query = (db, filter) => notionLogger(`Query DB: ${db}`, { filter });
 notionLogger.update = (pageId, msg) => notionLogger(`Update page ${pageId}: ${msg}`);
 notionLogger.create = (db, title) => notionLogger(`Create in ${db}: "${title}"`);
-notionLogger.success = (msg, extra) => baseLogger.info({ module: 'notion', ...extra }, msg);
-notionLogger.error = (msg, err) => baseLogger.error({ module: 'notion', error: err }, msg);
+notionLogger.success = (msg, extra) => baseLogger.info({ module: "notion", ...extra }, msg);
+notionLogger.error = (msg, err) => baseLogger.error({ module: "notion", error: err }, msg);
 
 const notion = notionLogger;
 
 // ─── Git-specific logger ──────────────────────────────────────────────────
 const git = {
-  commit: (msg, stats) => baseLogger.info({ module: 'git', ...stats }, `Commit: "${msg}"`),
-  hook: (msg) => baseLogger.debug({ module: 'git' }, msg),
+  commit: (msg, stats) => baseLogger.info({ module: "git", ...stats }, `Commit: "${msg}"`),
+  hook: (msg) => baseLogger.debug({ module: "git" }, msg)
 };
 
 // ─── Timer-specific logger ────────────────────────────────────────────────
 const timer = {
-  start: (time) => baseLogger.info({ module: 'timer' }, `Session started at ${time}`),
-  stop: (hrs) => baseLogger.info({ module: 'timer' }, `Session ended — Active: ${hrs} hrs`),
-  idle: (mins) => baseLogger.debug({ module: 'timer' }, `Idle detected: ${mins} min`),
+  start: (time) => baseLogger.info({ module: "timer" }, `Session started at ${time}`),
+  stop: (hrs) => baseLogger.info({ module: "timer" }, `Session ended — Active: ${hrs} hrs`),
+  idle: (mins) => baseLogger.debug({ module: "timer" }, `Idle detected: ${mins} min`)
 };
 
 // Also provide a generic timer function for legacy callers
 function timerFn(msg, extra) {
-  baseLogger.info({ module: 'timer', ...extra }, msg);
+  baseLogger.info({ module: "timer", ...extra }, msg);
 }
 
 timerFn.start = timer.start;
@@ -113,5 +113,5 @@ module.exports = {
   requestLogger,
 
   // Base logger for advanced usage
-  logger: baseLogger,
+  logger: baseLogger
 };
