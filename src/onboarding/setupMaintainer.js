@@ -84,7 +84,12 @@ async function createSprintDatabase(notion, parentPageId, logsDbId) {
         }
       },
       "Story Points": { number: { format: "number" } },
-      "Log Sheet": { relation: { database_id: logsDbId } }
+      "Log Sheet": {
+        relation: {
+          database_id: logsDbId,
+          single_property: {}
+        }
+      }
     }
   });
 }
@@ -93,7 +98,12 @@ async function addLogsRelationToSprint(notion, logsDbId, sprintDbId) {
   await notion.databases.update({
     database_id: logsDbId,
     properties: {
-      "Task (Linked)": { relation: { database_id: sprintDbId } }
+      "Task (Linked)": {
+        relation: {
+          database_id: sprintDbId,
+          single_property: {}
+        }
+      }
     }
   });
 }
