@@ -3,6 +3,15 @@
   "displayName": "HelloDev Tracker",
   "version": "1.0.0",
   "description": "HelloDev - Agentic Sprint Tracker powered by Notion MCP",
+  "publisher": "hellodev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/KimtVak8143/HelloDev.git"
+  },
+  "homepage": "https://github.com/KimtVak8143/HelloDev",
+  "bugs": {
+    "url": "https://github.com/KimtVak8143/HelloDev/issues"
+  },
   "main": "src/extension.js",
   "engines": {
     "vscode": "^1.95.0"
