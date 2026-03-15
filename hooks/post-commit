@@ -1,5 +1,21 @@
-#!/bin/bash
-MSG=$(git log -1 --pretty=%B)
-curl -s -X POST http://localhost:3333/commit \
-  -H "Content-Type: application/json" \
-  -d "{\"message\": \"$MSG\"}" > /dev/null
+#!/bin/sh
+HELLODEV_DIR="$(git rev-parse --show-toplevel)/.hellodev"
+[ ! -f "$HELLODEV_DIR/session.json" ] && exit 0
+
+HASH=$(git rev-parse HEAD)
+MESSAGE=$(git log -1 --pretty=%B | tr -d '\r' | tr '\n' ' ')
+FILES=$(git diff-tree --no-commit-id --name-only -r HEAD | wc -l | tr -d ' ')
+STATS=$(git diff --shortstat HEAD~1 HEAD)
+ADDED=$(echo "$STATS" | grep -o '[0-9]* insertion' | grep -o '[0-9]*')
+REMOVED=$(echo "$STATS" | grep -o '[0-9]* deletion' | grep -o '[0-9]*')
+
+cat > "$HELLODEV_DIR/pending-commit.json" << EOF
+{
+  "hash": "$HASH",
+  "message": "$MESSAGE",
+  "filesChanged": ${FILES:-0},
+  "linesAdded": ${ADDED:-0},
+  "linesRemoved": ${REMOVED:-0},
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+}
+EOF

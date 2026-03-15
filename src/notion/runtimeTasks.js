@@ -104,7 +104,76 @@ async function startTaskForDeveloper(state, task, developerName) {
   };
 }
 
+function computeHours(startedAtIso) {
+  const startedAt = new Date(startedAtIso).getTime();
+  if (!startedAt) {
+    return 0;
+  }
+  const elapsedMs = Math.max(Date.now() - startedAt, 0);
+  return elapsedMs / (1000 * 60 * 60);
+}
+
+async function syncActiveLogStats(state, activeSession) {
+  const headers = await createHeaders(state);
+  const url = `https://api.notion.com/v1/pages/${activeSession.logId}`;
+  await axios.patch(
+    url,
+    {
+      properties: {
+        "Commits Count": { number: activeSession.commits.length },
+        "Commit Messages": {
+          rich_text: [{ text: { content: activeSession.commits.join(" | ").slice(0, 1900) || "No commits" } }]
+        },
+        "Files Changed": { number: activeSession.filesChanged || 0 },
+        "Lines Added": { number: activeSession.linesAdded || 0 },
+        "Lines Removed": { number: activeSession.linesRemoved || 0 }
+      }
+    },
+    { headers }
+  );
+}
+
+async function completeTaskForDeveloper(state, activeSession) {
+  const headers = await createHeaders(state);
+  const hours = Number(computeHours(activeSession.startedAt).toFixed(2));
+
+  const taskUrl = `https://api.notion.com/v1/pages/${activeSession.taskPageId}`;
+  await axios.patch(
+    taskUrl,
+    {
+      properties: {
+        Status: { select: { name: "Done" } }
+      }
+    },
+    { headers }
+  );
+
+  const logUrl = `https://api.notion.com/v1/pages/${activeSession.logId}`;
+  await axios.patch(
+    logUrl,
+    {
+      properties: {
+        "Session End": { date: { start: new Date().toISOString() } },
+        "Total Time (hrs)": { number: hours },
+        "Commits Count": { number: activeSession.commits.length },
+        "Commit Messages": {
+          rich_text: [{ text: { content: activeSession.commits.join(" | ").slice(0, 1900) || "No commits" } }]
+        },
+        "Files Changed": { number: activeSession.filesChanged || 0 },
+        "Lines Added": { number: activeSession.linesAdded || 0 },
+        "Lines Removed": { number: activeSession.linesRemoved || 0 },
+        Status: { select: { name: "Completed" } }
+      }
+    },
+    { headers }
+  );
+
+  return { hours };
+}
+
 module.exports = {
   listTasksForDeveloper,
-  startTaskForDeveloper
+  startTaskForDeveloper,
+  syncActiveLogStats,
+  completeTaskForDeveloper
 };
