@@ -26,7 +26,7 @@ async function activate(context) {
   }
 
   registerHelloDevCommands(context, state, output);
-  await startMcpHost(output);
+  await startMcpHost(state, output);
   commitWatcher = startPendingCommitWatcher(state, output);
 
   output.info("HelloDev extension activated");

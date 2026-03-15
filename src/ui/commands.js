@@ -2,30 +2,16 @@
 
 const vscode = require("vscode");
 const { OnboardingPanel } = require("../onboarding/OnboardingPanel");
-const { getGitIdentity } = require("../utils/identity");
-const {
-  listTasksForDeveloper,
-  startTaskForDeveloper,
-  completeTaskForDeveloper
-} = require("../notion/runtimeTasks");
+const { getMyTasks, startTask, getStatus, completeTask } = require("../runtime/actions");
 const { installGitHooks } = require("../trackers/gitHook");
-const { clearSession, saveSession } = require("../runtime/sessionStore");
 
 function notImplemented(label) {
   return `HelloDev: ${label} is scaffolded and next in implementation.`;
 }
 
 async function handleMyTasks(state, output) {
-  const identity = await getGitIdentity();
-  if (!identity.name) {
-    await vscode.window.showErrorMessage(
-      "Git user.name is missing. Set it with: git config --global user.name \"Your Name\""
-    );
-    return;
-  }
-
   try {
-    const tasks = await listTasksForDeveloper(state, identity.name);
+    const { identity, tasks } = await getMyTasks(state);
     if (tasks.length === 0) {
       await vscode.window.showInformationMessage(
         `No pending tasks for ${identity.name}.`
@@ -55,24 +41,8 @@ async function handleMyTasks(state, output) {
 }
 
 async function handleStartTask(state, output) {
-  const current = state.getActiveSession();
-  if (current) {
-    await vscode.window.showWarningMessage(
-      `Active task already running: ${current.taskId} (${current.taskName}).`
-    );
-    return;
-  }
-
-  const identity = await getGitIdentity();
-  if (!identity.name) {
-    await vscode.window.showErrorMessage(
-      "Git user.name is missing. Set it with: git config --global user.name \"Your Name\""
-    );
-    return;
-  }
-
   try {
-    const tasks = await listTasksForDeveloper(state, identity.name);
+    const { identity, tasks } = await getMyTasks(state);
     if (tasks.length === 0) {
       await vscode.window.showInformationMessage(
         `No pending tasks for ${identity.name}.`
@@ -97,15 +67,7 @@ async function handleStartTask(state, output) {
       return;
     }
 
-    const session = await startTaskForDeveloper(state, picked.task, identity.name);
-    state.setActiveSession({
-      ...session,
-      commits: [],
-      filesChanged: 0,
-      linesAdded: 0,
-      linesRemoved: 0
-    });
-    saveSession(state.getActiveSession());
+    const session = await startTask(state, picked.task);
     output.info(`Session started for ${session.taskId} by ${session.developerName}`);
 
     await vscode.window.showInformationMessage(
@@ -117,37 +79,21 @@ async function handleStartTask(state, output) {
   }
 }
 
-function formatElapsed(startedAt) {
-  const ms = Math.max(Date.now() - new Date(startedAt).getTime(), 0);
-  const mins = Math.floor(ms / 60000);
-  const hours = Math.floor(mins / 60);
-  const remMins = mins % 60;
-  return `${hours}h ${remMins}m`;
-}
-
 async function handleViewStatus(state) {
-  const active = state.getActiveSession();
-  if (!active) {
+  const status = getStatus(state);
+  if (!status.active) {
     await vscode.window.showInformationMessage("No active session running.");
     return;
   }
 
   await vscode.window.showInformationMessage(
-    `Active: ${active.taskId} (${active.taskName}) | ${formatElapsed(active.startedAt)} | ${active.commits.length} commits`
+    `Active: ${status.taskId} (${status.taskName}) | ${status.elapsed} | ${status.commits} commits`
   );
 }
 
 async function handleCompleteTask(state, output) {
-  const active = state.getActiveSession();
-  if (!active) {
-    await vscode.window.showInformationMessage("No active session to complete.");
-    return;
-  }
-
   try {
-    const result = await completeTaskForDeveloper(state, active);
-    state.clearActiveSession();
-    clearSession();
+    const { active, result } = await completeTask(state);
     output.info(`Session completed for ${active.taskId}`);
     await vscode.window.showInformationMessage(
       `Completed ${active.taskId}: ${active.taskName} (${result.hours} hrs)`
