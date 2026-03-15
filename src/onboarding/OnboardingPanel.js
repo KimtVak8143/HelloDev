@@ -3,6 +3,7 @@
 const vscode = require("vscode");
 const { captureNotionToken } = require("./notionAuth");
 const { setupMaintainerWorkspace } = require("./setupMaintainer");
+const { getGitIdentity } = require("../utils/identity");
 
 class OnboardingPanel {
   static currentPanel = undefined;
@@ -71,8 +72,17 @@ class OnboardingPanel {
             );
           }
         } else {
+          const identity = await getGitIdentity();
+          if (!identity.isComplete) {
+            await vscode.window.showWarningMessage(
+              "HelloDev developer onboarding saved token, but git user.name/user.email are missing."
+            );
+          }
           await vscode.window.showInformationMessage(
-            `HelloDev onboarding complete for ${role}.`
+            `HelloDev onboarding complete for ${role}.` +
+              (identity.isComplete
+                ? ` Detected: ${identity.name} (${identity.email})`
+                : "")
           );
         }
       }
