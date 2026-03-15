@@ -20,7 +20,7 @@ function startTracking() {
     }
   }, 60 * 1000);
 
-  logger.timer(`Session timer started`, { at: new Date().toLocaleTimeString() });
+  logger.timer("Session timer started", { at: new Date().toLocaleTimeString() });
 }
 
 function recordActivity() {
@@ -54,7 +54,7 @@ function stopTracking(session) {
 }
 
 function getElapsed() {
-  if (!sessionStart) return "0.00";
+  if (!sessionStart) {return "0.00";}
   return ((Date.now() - sessionStart) / (1000 * 60 * 60)).toFixed(2);
 }
 

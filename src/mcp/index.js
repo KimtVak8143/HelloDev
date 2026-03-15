@@ -41,7 +41,7 @@ function text(content) {
 // ─── Create MCP Server ────────────────────────────────────────────────────────
 const server = new McpServer({
   name:    "HelloDev-tracker",
-  version: "1.0.0",
+  version: "1.0.0"
 });
 
 // ─── TOOL: list_tasks ─────────────────────────────────────────────────────────
@@ -53,10 +53,10 @@ server.tool(
   },
   async ({ developer }) => {
     const result = await callHelloDev("get", `/tasks/${developer}`);
-    if (!result.ok) return text(`❌ ${result.error}`);
+    if (!result.ok) {return text(`❌ ${result.error}`);}
 
     const { tasks } = result.data;
-    if (!tasks.length) return text(`✅ No pending tasks for ${developer}. Sprint board is clear!`);
+    if (!tasks.length) {return text(`✅ No pending tasks for ${developer}. Sprint board is clear!`);}
 
     const lines = tasks.map((t, i) =>
       `  ${i + 1}. [${t.status}] ${t.id} — ${t.name}\n     Priority: ${t.priority} | Story Points: ${t.points}`
@@ -76,18 +76,18 @@ server.tool(
   },
   async ({ bug_id, developer }) => {
     const result = await callHelloDev("post", "/start", { bugId: bug_id, developer });
-    if (!result.ok) return text(`❌ ${result.error}`);
+    if (!result.ok) {return text(`❌ ${result.error}`);}
 
     const { taskName, logId, startedAt } = result.data;
     return text(
-      `🚀 Session started!\n\n` +
+      "🚀 Session started!\n\n" +
       `  Task:      ${taskName} (${bug_id})\n` +
       `  Developer: ${developer}\n` +
       `  Started:   ${new Date(startedAt).toLocaleTimeString()}\n` +
       `  Log ID:    ${logId}\n\n` +
-      `Notion updated → In Progress ✅\n` +
-      `Timer running in background ⏱️\n\n` +
-      `Git commits will be auto-logged. Run complete_task when done.`
+      "Notion updated → In Progress ✅\n" +
+      "Timer running in background ⏱️\n\n" +
+      "Git commits will be auto-logged. Run complete_task when done."
     );
   }
 );
@@ -101,21 +101,21 @@ server.tool(
   },
   async ({ bug_id }) => {
     const result = await callHelloDev("post", "/done", { bugId: bug_id });
-    if (!result.ok) return text(`❌ ${result.error}`);
+    if (!result.ok) {return text(`❌ ${result.error}`);}
 
     const { taskName, developer, totalHrs, commits, filesChanged, linesAdded, linesRemoved } = result.data;
     return text(
-      `🎉 Task Complete!\n\n` +
+      "🎉 Task Complete!\n\n" +
       `  Task:          ${taskName} (${bug_id})\n` +
       `  Developer:     ${developer}\n\n` +
-      `📊 Session Stats:\n` +
+      "📊 Session Stats:\n" +
       `  ⏱️  Time:         ${totalHrs} hrs\n` +
       `  📝 Commits:      ${commits}\n` +
       `  📁 Files Changed: ${filesChanged}\n` +
       `  ➕ Lines Added:   ${linesAdded}\n` +
       `  ➖ Lines Removed: ${linesRemoved}\n\n` +
-      `Notion updated → Done ✅\n` +
-      `Activity Log sealed and linked to task ✅`
+      "Notion updated → Done ✅\n" +
+      "Activity Log sealed and linked to task ✅"
     );
   }
 );
@@ -127,20 +127,20 @@ server.tool(
   {},
   async () => {
     const result = await callHelloDev("get", "/status");
-    if (!result.ok) return text(`❌ ${result.error}`);
+    if (!result.ok) {return text(`❌ ${result.error}`);}
 
     const data = result.data;
     if (!data.active) {
-      return text(`💤 No active session running.\n\nUse list_tasks to see what's available, then start_task to begin.`);
+      return text("💤 No active session running.\n\nUse list_tasks to see what's available, then start_task to begin.");
     }
 
     return text(
-      `⚡ Active Session\n\n` +
+      "⚡ Active Session\n\n" +
       `  Task:      ${data.taskName} (${data.bugId})\n` +
       `  Developer: ${data.developer}\n` +
       `  Elapsed:   ${data.elapsed}\n` +
       `  Commits:   ${data.commits}\n\n` +
-      `Keep going! Run complete_task when you're done.`
+      "Keep going! Run complete_task when you're done."
     );
   }
 );
@@ -154,15 +154,15 @@ server.tool(
   },
   async ({ developer }) => {
     const result = await callHelloDev("get", "/");
-    if (!result.ok) return text(`❌ ${result.error}`);
+    if (!result.ok) {return text(`❌ ${result.error}`);}
 
     // Also get tasks if developer provided
     if (developer) {
       const tasks = await callHelloDev("get", `/tasks/${developer}`);
-      if (!tasks.ok) return text(`❌ ${tasks.error}`);
+      if (!tasks.ok) {return text(`❌ ${tasks.error}`);}
 
       const list = tasks.data.tasks;
-      if (!list.length) return text(`✅ ${developer} has no pending tasks!`);
+      if (!list.length) {return text(`✅ ${developer} has no pending tasks!`);}
 
       const lines = list.map(t =>
         `  [${t.status.padEnd(11)}] ${t.id.padEnd(12)} ${t.name} (${t.priority})`
@@ -173,11 +173,11 @@ server.tool(
 
     const session = result.data.session;
     return text(
-      `🚀 HelloDev Sprint Tracker\n\n` +
+      "🚀 HelloDev Sprint Tracker\n\n" +
       `Server: Running on port ${process.env.PORT || 3333}\n\n` +
       (session
         ? `Active Session:\n  ${session.developer} → ${session.bugId} | ${session.elapsed} | ${session.commits} commits`
-        : `No active session. Use list_tasks to get started.`
+        : "No active session. Use list_tasks to get started."
       )
     );
   }

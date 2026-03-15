@@ -9,19 +9,19 @@ const app = express();
 // Capture raw body using standard Express middleware that stores it
 app.use(express.json({ 
   verify: (req, res, buf, encoding) => {
-    req.rawBody = buf.toString(encoding || 'utf8');
+    req.rawBody = buf.toString(encoding || "utf8");
   }
 }));
 app.use(log.requestLogger);
 
 // JSON parsing error handler - catches SyntaxErrors from express.json()
 app.use((err, req, res, next) => {
-  if (err && (err instanceof SyntaxError || err.message.includes('JSON'))) {
-    log.error('Malformed JSON in request', {
+  if (err && (err instanceof SyntaxError || err.message.includes("JSON"))) {
+    log.error("Malformed JSON in request", {
       message: err.message,
-      rawBody: req.rawBody ? req.rawBody.substring(0, 150) : 'N/A'
+      rawBody: req.rawBody ? req.rawBody.substring(0, 150) : "N/A"
     });
-    return res.status(400).json({ error: 'Malformed JSON: ' + err.message });
+    return res.status(400).json({ error: "Malformed JSON: " + err.message });
   }
   next(err);
 });
@@ -46,9 +46,9 @@ app.post("/start", async (req, res) => {
   try {
     const { bugId, developer } = req.body;
     if (!bugId || !developer)
-      return res.status(400).json({ error: "bugId and developer are required" });
+    {return res.status(400).json({ error: "bugId and developer are required" });}
     if (activeSession)
-      return res.status(409).json({ error: `Session already active for ${activeSession.bugId}. Run /done first.` });
+    {return res.status(409).json({ error: `Session already active for ${activeSession.bugId}. Run /done first.` });}
 
     const { taskId, taskName, logId } = await startTask(bugId, developer);
     activeSession = { bugId, logId, taskId, taskName, developer,
@@ -69,9 +69,9 @@ app.post("/done", async (req, res) => {
   try {
     const { bugId } = req.body;
     if (!activeSession)
-      return res.status(400).json({ error: "No active session. Use /start first." });
+    {return res.status(400).json({ error: "No active session. Use /start first." });}
     if (activeSession.bugId !== bugId)
-      return res.status(409).json({ error: `Active session is for ${activeSession.bugId}, not ${bugId}` });
+    {return res.status(409).json({ error: `Active session is for ${activeSession.bugId}, not ${bugId}` });}
 
     const stats = stopTracking(activeSession);
     const { taskName } = await completeTask(bugId, activeSession.logId, stats);
@@ -102,7 +102,7 @@ app.post("/commit", (req, res) => {
 
 app.get("/status", (req, res) => {
   if (!activeSession)
-    return res.json({ active: false, message: "No session running" });
+  {return res.json({ active: false, message: "No session running" });}
   res.json({ active: true, bugId: activeSession.bugId, taskName: activeSession.taskName,
     developer: activeSession.developer, elapsed: `${getElapsed()} hrs`, commits: activeSession.commits.length });
 });

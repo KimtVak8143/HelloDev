@@ -16,8 +16,8 @@ async function notionQuery(databaseId, body = {}) {
     headers: {
       Authorization: `Bearer ${process.env.NOTION_API_KEY}`,
       "Notion-Version": "2022-06-28",
-      "Content-Type": "application/json",
-    },
+      "Content-Type": "application/json"
+    }
   });
   return response.data;
 }
@@ -28,7 +28,7 @@ async function findTask(bugId) {
   const res = await notionQuery(SPRINT_DB_ID, {
     filter: { property: "Bug/Feature ID", rich_text: { equals: bugId } }
   });
-  if (!res.results.length) throw new Error(`Task "${bugId}" not found in Sprint Board.`);
+  if (!res.results.length) {throw new Error(`Task "${bugId}" not found in Sprint Board.`);}
   const task = res.results[0];
   logger.notion("Task found", { bugId, taskName: task.properties["Task Name"].title[0]?.plain_text, pageId: task.id });
   return task;

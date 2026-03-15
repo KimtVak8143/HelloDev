@@ -1,8 +1,57 @@
 {
   "name": "hellodev-tracker",
+  "displayName": "HelloDev Tracker",
   "version": "1.0.0",
-  "description": "HelloDev — Agentic Sprint Tracker powered by Notion MCP",
-  "main": "src/server.js",
+  "description": "HelloDev - Agentic Sprint Tracker powered by Notion MCP",
+  "main": "src/extension.js",
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished",
+    "onCommand:hellodev.startTask",
+    "onCommand:hellodev.completeTask",
+    "onCommand:hellodev.viewStatus",
+    "onCommand:hellodev.myTasks",
+    "onCommand:hellodev.generateStandup",
+    "onCommand:hellodev.installGitHook",
+    "onCommand:hellodev.openOnboarding"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "hellodev.startTask",
+        "title": "HelloDev: Start Task"
+      },
+      {
+        "command": "hellodev.completeTask",
+        "title": "HelloDev: Complete Task"
+      },
+      {
+        "command": "hellodev.viewStatus",
+        "title": "HelloDev: View Status"
+      },
+      {
+        "command": "hellodev.myTasks",
+        "title": "HelloDev: My Tasks"
+      },
+      {
+        "command": "hellodev.generateStandup",
+        "title": "HelloDev: Generate Standup"
+      },
+      {
+        "command": "hellodev.installGitHook",
+        "title": "HelloDev: Install Git Hook"
+      },
+      {
+        "command": "hellodev.openOnboarding",
+        "title": "HelloDev: Open Onboarding"
+      }
+    ]
+  },
   "bin": {
     "hellodev": "./src/cli/commands.js"
   },
@@ -13,6 +62,7 @@
     "dev": "node src/server.js",
     "mcp": "node src/mcp/index.js",
     "all": "concurrently \"npm run dev\" \"npm run mcp\"",
+    "package:vsix": "vsce package",
     "lint": "eslint src/ --fix",
     "format": "prettier --write src/ openapi.yaml README.md",
     "check-format": "prettier --check src/ openapi.yaml README.md",
@@ -44,6 +94,7 @@
     "eslint-config-prettier": "^10.1.8",
     "jest": "^30.3.0",
     "nodemon": "^3.0.0",
-    "prettier": "^3.8.1"
+    "prettier": "^3.8.1",
+    "vsce": "^2.15.0"
   }
 }
