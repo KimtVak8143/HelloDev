@@ -1,0 +1,10 @@
+.env
+.github/**
+.vscode/**
+coverage/**
+node_modules/**
+openapi.yaml
+debug.js
+test-connection.js
+jest.config.js
+*.log

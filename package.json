@@ -57,10 +57,10 @@
     "hellodev": "./src/cli/commands.js"
   },
   "scripts": {
-    "start": "node src/server.js",
+    "start": "node src/extension.js",
     "test-connection": "node test-connection.js",
     "build": "npm run verify",
-    "dev": "node src/server.js",
+    "dev": "node src/extension.js",
     "mcp": "node src/mcp/index.js",
     "all": "concurrently \"npm run dev\" \"npm run mcp\"",
     "package:vsix": "vsce package",

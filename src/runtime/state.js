@@ -6,7 +6,8 @@ function createRuntimeState(context) {
     notionToken: "hellodev.notionToken",
     sprintDbId: "hellodev.sprintDbId",
     logsDbId: "hellodev.logsDbId",
-    devsDbId: "hellodev.devsDbId"
+    devsDbId: "hellodev.devsDbId",
+    standupParentPageId: "hellodev.standupParentPageId"
   };
 
   return {
@@ -45,6 +46,12 @@ function createRuntimeState(context) {
         logsDbId: context.globalState.get(keys.logsDbId),
         devsDbId: context.globalState.get(keys.devsDbId)
       };
+    },
+    async setStandupPageId(pageId) {
+      await context.globalState.update(keys.standupParentPageId, pageId);
+    },
+    async getStandupPageId() {
+      return context.globalState.get(keys.standupParentPageId);
     }
   };
 }

@@ -299,6 +299,48 @@ async function generateStandupReport(state) {
   return `Standup (last 24h)\n${lines.join("\n")}`;
 }
 
+async function publishStandupToNotion(state, reportText) {
+  const token = await state.getNotionToken();
+  if (!token) {
+    throw new Error("Notion token not found. Run HelloDev onboarding first.");
+  }
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    "Notion-Version": "2022-06-28",
+    "Content-Type": "application/json"
+  };
+
+  const parentPageId = await state.getStandupPageId();
+  if (!parentPageId) {
+    return { published: false, reason: "missing_standup_parent" };
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const response = await axios.post(
+    "https://api.notion.com/v1/pages",
+    {
+      parent: { type: "page_id", page_id: parentPageId },
+      properties: {
+        title: {
+          title: [{ text: { content: `Standup - ${today}` } }]
+        }
+      },
+      children: [
+        {
+          object: "block",
+          type: "paragraph",
+          paragraph: {
+            rich_text: [{ type: "text", text: { content: reportText.slice(0, 2000) } }]
+          }
+        }
+      ]
+    },
+    { headers }
+  );
+
+  return { published: true, pageId: response.data.id };
+}
+
 module.exports = {
   listTasksForDeveloper,
   startTaskForDeveloper,
@@ -306,5 +348,6 @@ module.exports = {
   completeTaskForDeveloper,
   listSprintBoard,
   upsertDeveloper,
-  generateStandupReport
+  generateStandupReport,
+  publishStandupToNotion
 };

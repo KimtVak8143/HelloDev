@@ -8,9 +8,11 @@ const {
   getStatus,
   completeTask,
   registerDeveloper,
-  generateStandup
+  generateStandup,
+  publishStandup
 } = require("../runtime/actions");
 const { installGitHooks } = require("../trackers/gitHook");
+const { StandupPanel } = require("./standupPanel");
 
 async function handleMyTasks(state, output) {
   try {
@@ -121,8 +123,39 @@ async function handleInstallGitHook(output) {
 async function handleGenerateStandup(state, output) {
   try {
     const report = await generateStandup(state);
+    StandupPanel.open(report);
+
+    const publishChoice = await vscode.window.showInformationMessage(
+      "Standup generated. Publish to Notion now?",
+      "Publish",
+      "Skip"
+    );
+
+    if (publishChoice === "Publish") {
+      let parentPageId = await state.getStandupPageId();
+      if (!parentPageId) {
+        const input = await vscode.window.showInputBox({
+          title: "Standup Parent Page ID",
+          prompt: "Paste Notion parent page ID where standup pages should be created",
+          ignoreFocusOut: true
+        });
+        if (input && input.trim()) {
+          parentPageId = input.trim().replace(/-/g, "");
+          await state.setStandupPageId(parentPageId);
+        }
+      }
+
+      const publish = await publishStandup(state, report);
+      if (publish.published) {
+        await vscode.window.showInformationMessage("Standup published to Notion.");
+      } else {
+        await vscode.window.showWarningMessage(
+          "Standup not published. Set standup parent page ID and retry."
+        );
+      }
+    }
+
     output.info("Standup generated");
-    await vscode.window.showInformationMessage("HelloDev standup generated. See output panel.");
     output.show(true);
     output.info(report);
   } catch (error) {

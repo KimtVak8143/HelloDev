@@ -8,7 +8,8 @@ const {
   listSprintBoard,
   upsertDeveloper,
   generateStandupReport,
-  syncActiveLogStats
+  syncActiveLogStats,
+  publishStandupToNotion
 } = require("../notion/runtimeTasks");
 const { clearSession, saveSession } = require("./sessionStore");
 
@@ -110,6 +111,10 @@ async function generateStandup(state) {
   return generateStandupReport(state);
 }
 
+async function publishStandup(state, report) {
+  return publishStandupToNotion(state, report);
+}
+
 module.exports = {
   getMyTasks,
   startTask,
@@ -118,5 +123,6 @@ module.exports = {
   registerDeveloper,
   getSprint,
   logCommit,
-  generateStandup
+  generateStandup,
+  publishStandup
 };
