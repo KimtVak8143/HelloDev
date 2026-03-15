@@ -30,6 +30,41 @@ function sanitizePageId(raw) {
   return raw.trim().replace(/-/g, "");
 }
 
+function getDatabaseTitle(database) {
+  const parts = Array.isArray(database.title) ? database.title : [];
+  return parts.map((part) => part.plain_text || "").join("").trim();
+}
+
+async function findDatabaseByTitle(notion, parentPageId, wantedTitle) {
+  const matches = [];
+  let cursor = undefined;
+  do {
+    const response = await notion.search({
+      query: wantedTitle,
+      filter: { property: "object", value: "database" },
+      start_cursor: cursor
+    });
+
+    const pageMatches = response.results.filter((result) => {
+      if (result.object !== "database") {
+        return false;
+      }
+      if (result.parent?.type !== "page_id") {
+        return false;
+      }
+      return (
+        result.parent.page_id === parentPageId &&
+        getDatabaseTitle(result).toLowerCase() === wantedTitle.toLowerCase()
+      );
+    });
+
+    matches.push(...pageMatches);
+    cursor = response.has_more ? response.next_cursor : undefined;
+  } while (cursor);
+
+  return matches;
+}
+
 async function createLogsDatabase(notion, parentPageId) {
   return notion.databases.create({
     parent: { type: "page_id", page_id: parentPageId },
@@ -108,6 +143,20 @@ async function addLogsRelationToSprint(notion, logsDbId, sprintDbId) {
   });
 }
 
+async function ensureSprintLogsRelation(notion, sprintDbId, logsDbId) {
+  await notion.databases.update({
+    database_id: sprintDbId,
+    properties: {
+      "Log Sheet": {
+        relation: {
+          database_id: logsDbId,
+          single_property: {}
+        }
+      }
+    }
+  });
+}
+
 async function createDevelopersDatabase(notion, parentPageId) {
   return notion.databases.create({
     parent: { type: "page_id", page_id: parentPageId },
@@ -118,6 +167,37 @@ async function createDevelopersDatabase(notion, parentPageId) {
       Role: { select: { options: [{ name: "Maintainer" }, { name: "Developer" }] } }
     }
   });
+}
+
+async function archiveDatabase(notion, databaseId, output) {
+  try {
+    await notion.databases.update({
+      database_id: databaseId,
+      archived: true
+    });
+    output.warn(`Rolled back database ${databaseId}`);
+  } catch (error) {
+    output.error(`Rollback failed for ${databaseId}: ${error.message}`);
+  }
+}
+
+async function getOrCreateDatabase(notion, output, parentPageId, name, createFn, createdIds) {
+  const existing = await findDatabaseByTitle(notion, parentPageId, name);
+  if (existing.length > 1) {
+    const ids = existing.map((db) => db.id).join(", ");
+    throw new Error(
+      `Multiple "${name}" databases found under parent page. Please keep one and archive others. IDs: ${ids}`
+    );
+  }
+  if (existing.length === 1) {
+    output.info(`Reusing existing database: ${name}`);
+    return { db: existing[0], created: false };
+  }
+
+  const created = await createFn();
+  output.info(`Created database: ${name}`);
+  createdIds.push(created.id);
+  return { db: created, created: true };
 }
 
 async function setupMaintainerWorkspace(state, output) {
@@ -133,26 +213,59 @@ async function setupMaintainerWorkspace(state, output) {
   const parentPageId = sanitizePageId(parentPageRaw);
 
   const notion = new Client({ auth: token });
-  output.info("Creating HelloDev Notion databases for maintainer");
+  const createdIds = [];
+  output.info("Preparing HelloDev Notion databases for maintainer");
 
-  const logsDb = await createLogsDatabase(notion, parentPageId);
-  const sprintDb = await createSprintDatabase(notion, parentPageId, logsDb.id);
-  await addLogsRelationToSprint(notion, logsDb.id, sprintDb.id);
-  const devsDb = await createDevelopersDatabase(notion, parentPageId);
+  try {
+    const logs = await getOrCreateDatabase(
+      notion,
+      output,
+      parentPageId,
+      "Activity Logs",
+      () => createLogsDatabase(notion, parentPageId),
+      createdIds
+    );
+    const sprint = await getOrCreateDatabase(
+      notion,
+      output,
+      parentPageId,
+      "Sprint Board",
+      () => createSprintDatabase(notion, parentPageId, logs.db.id),
+      createdIds
+    );
+    const devs = await getOrCreateDatabase(
+      notion,
+      output,
+      parentPageId,
+      "Developers",
+      () => createDevelopersDatabase(notion, parentPageId),
+      createdIds
+    );
 
-  await state.setWorkspaceDatabaseIds({
-    sprintDbId: sprintDb.id,
-    logsDbId: logsDb.id,
-    devsDbId: devsDb.id
-  });
+    await ensureSprintLogsRelation(notion, sprint.db.id, logs.db.id);
+    await addLogsRelationToSprint(notion, logs.db.id, sprint.db.id);
 
-  output.info("Maintainer workspace setup complete");
-  return {
-    created: true,
-    sprintDbId: sprintDb.id,
-    logsDbId: logsDb.id,
-    devsDbId: devsDb.id
-  };
+    await state.setWorkspaceDatabaseIds({
+      sprintDbId: sprint.db.id,
+      logsDbId: logs.db.id,
+      devsDbId: devs.db.id
+    });
+
+    output.info("Maintainer workspace setup complete");
+    return {
+      created: logs.created || sprint.created || devs.created,
+      reused: !(logs.created || sprint.created || devs.created),
+      sprintDbId: sprint.db.id,
+      logsDbId: logs.db.id,
+      devsDbId: devs.db.id
+    };
+  } catch (error) {
+    output.error(`Maintainer setup failed. Rolling back: ${error.message}`);
+    for (const databaseId of createdIds.reverse()) {
+      await archiveDatabase(notion, databaseId, output);
+    }
+    throw error;
+  }
 }
 
 module.exports = {

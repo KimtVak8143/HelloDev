@@ -59,6 +59,10 @@ class OnboardingPanel {
               await vscode.window.showInformationMessage(
                 "HelloDev onboarding complete for maintainer. Databases created."
               );
+            } else {
+              await vscode.window.showInformationMessage(
+                "HelloDev onboarding complete for maintainer. Existing databases reused."
+              );
             }
           } catch (error) {
             this.output.error(`Maintainer setup failed: ${error.message}`);
