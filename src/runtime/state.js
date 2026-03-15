@@ -13,6 +13,15 @@ function createRuntimeState(context) {
     context,
     keys,
     activeSession: null,
+    setActiveSession(session) {
+      this.activeSession = session;
+    },
+    clearActiveSession() {
+      this.activeSession = null;
+    },
+    getActiveSession() {
+      return this.activeSession;
+    },
     async setRole(role) {
       await context.globalState.update(keys.role, role);
     },

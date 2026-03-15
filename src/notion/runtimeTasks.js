@@ -47,6 +47,7 @@ async function listTasksForDeveloper(state, developerName) {
 
   const response = await axios.post(url, body, { headers });
   return (response.data.results || []).map((page) => ({
+    pageId: page.id,
     id: safeText(page.properties?.["Bug/Feature ID"]?.rich_text) || "N/A",
     name: safeText(page.properties?.["Task Name"]?.title) || "Untitled",
     status: page.properties?.Status?.select?.name || "Unknown",
@@ -55,6 +56,55 @@ async function listTasksForDeveloper(state, developerName) {
   }));
 }
 
+async function startTaskForDeveloper(state, task, developerName) {
+  const ids = requireWorkspaceConfig(state);
+  if (!ids.logsDbId) {
+    throw new Error(
+      "Activity Logs database is not configured. Ask maintainer to run onboarding setup."
+    );
+  }
+  const headers = await createHeaders(state);
+  const now = new Date().toISOString();
+
+  const taskUpdateUrl = `https://api.notion.com/v1/pages/${task.pageId}`;
+  await axios.patch(
+    taskUpdateUrl,
+    {
+      properties: {
+        Status: { select: { name: "In Progress" } }
+      }
+    },
+    { headers }
+  );
+
+  const logTitle = `${developerName} - ${task.id} - ${new Date().toLocaleDateString()}`;
+  const logCreateUrl = "https://api.notion.com/v1/pages";
+  const logResponse = await axios.post(
+    logCreateUrl,
+    {
+      parent: { database_id: ids.logsDbId },
+      properties: {
+        "Log Title": { title: [{ text: { content: logTitle } }] },
+        Developer: { rich_text: [{ text: { content: developerName } }] },
+        "Task (Linked)": { relation: [{ id: task.pageId }] },
+        "Session Start": { date: { start: now } },
+        Status: { select: { name: "Active" } }
+      }
+    },
+    { headers }
+  );
+
+  return {
+    taskPageId: task.pageId,
+    taskId: task.id,
+    taskName: task.name,
+    developerName,
+    logId: logResponse.data.id,
+    startedAt: now
+  };
+}
+
 module.exports = {
-  listTasksForDeveloper
+  listTasksForDeveloper,
+  startTaskForDeveloper
 };
