@@ -38,9 +38,13 @@ class OnboardingPanel {
       null,
       context.subscriptions
     );
-    this.panel.onDidDispose(() => {
-      OnboardingPanel.currentPanel = undefined;
-    }, null, context.subscriptions);
+    this.panel.onDidDispose(
+      () => {
+        OnboardingPanel.currentPanel = undefined;
+      },
+      null,
+      context.subscriptions
+    );
   }
 
   async handleMessage(message) {
@@ -81,9 +85,7 @@ class OnboardingPanel {
           }
           await vscode.window.showInformationMessage(
             `HelloDev onboarding complete for ${role}.` +
-              (identity.isComplete
-                ? ` Detected: ${identity.name} (${identity.email})`
-                : "")
+              (identity.isComplete ? ` Detected: ${identity.name} (${identity.email})` : "")
           );
           if (identity.isComplete) {
             try {

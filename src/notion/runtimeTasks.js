@@ -129,7 +129,9 @@ async function syncActiveLogStats(state, activeSession) {
       properties: {
         "Commits Count": { number: activeSession.commits.length },
         "Commit Messages": {
-          rich_text: [{ text: { content: activeSession.commits.join(" | ").slice(0, 1900) || "No commits" } }]
+          rich_text: [
+            { text: { content: activeSession.commits.join(" | ").slice(0, 1900) || "No commits" } }
+          ]
         },
         "Files Changed": { number: activeSession.filesChanged || 0 },
         "Lines Added": { number: activeSession.linesAdded || 0 },
@@ -164,7 +166,9 @@ async function completeTaskForDeveloper(state, activeSession) {
         "Total Time (hrs)": { number: hours },
         "Commits Count": { number: activeSession.commits.length },
         "Commit Messages": {
-          rich_text: [{ text: { content: activeSession.commits.join(" | ").slice(0, 1900) || "No commits" } }]
+          rich_text: [
+            { text: { content: activeSession.commits.join(" | ").slice(0, 1900) || "No commits" } }
+          ]
         },
         "Files Changed": { number: activeSession.filesChanged || 0 },
         "Lines Added": { number: activeSession.linesAdded || 0 },

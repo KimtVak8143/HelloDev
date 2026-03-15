@@ -32,7 +32,10 @@ function sanitizePageId(raw) {
 
 function getDatabaseTitle(database) {
   const parts = Array.isArray(database.title) ? database.title : [];
-  return parts.map((part) => part.plain_text || "").join("").trim();
+  return parts
+    .map((part) => part.plain_text || "")
+    .join("")
+    .trim();
 }
 
 async function findDatabaseByTitle(notion, parentPageId, wantedTitle) {
@@ -71,7 +74,7 @@ async function createLogsDatabase(notion, parentPageId) {
     title: title("Activity Logs"),
     properties: {
       "Log Title": { title: {} },
-      "Developer": { rich_text: {} },
+      Developer: { rich_text: {} },
       "Session Start": { date: {} },
       "Session End": { date: {} },
       "Total Time (hrs)": { number: { format: "number" } },
@@ -80,7 +83,7 @@ async function createLogsDatabase(notion, parentPageId) {
       "Files Changed": { number: { format: "number" } },
       "Lines Added": { number: { format: "number" } },
       "Lines Removed": { number: { format: "number" } },
-      "Status": {
+      Status: {
         select: {
           options: [{ name: "Active" }, { name: "Completed" }]
         }
@@ -96,7 +99,7 @@ async function createSprintDatabase(notion, parentPageId, logsDbId) {
     properties: {
       "Task Name": { title: {} },
       "Bug/Feature ID": { rich_text: {} },
-      "Status": {
+      Status: {
         select: {
           options: [
             { name: "Todo" },
@@ -106,11 +109,11 @@ async function createSprintDatabase(notion, parentPageId, logsDbId) {
           ]
         }
       },
-      "Priority": {
+      Priority: {
         select: { options: [{ name: "High" }, { name: "Medium" }, { name: "Low" }] }
       },
       "Assigned To": { rich_text: {} },
-      "Sprint": {
+      Sprint: {
         select: { options: [{ name: "Sprint 1" }, { name: "Sprint 2" }, { name: "Sprint 3" }] }
       },
       "Task Type": {

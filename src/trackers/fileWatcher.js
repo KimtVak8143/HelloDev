@@ -1,7 +1,12 @@
 "use strict";
 
 const fs = require("fs");
-const { ensureHelloDevDir, getHelloDevDir, getPendingCommitPath, saveSession } = require("../runtime/sessionStore");
+const {
+  ensureHelloDevDir,
+  getHelloDevDir,
+  getPendingCommitPath,
+  saveSession
+} = require("../runtime/sessionStore");
 const { syncActiveLogStats } = require("../notion/runtimeTasks");
 
 function normalizeCommitPayload(commit) {

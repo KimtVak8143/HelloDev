@@ -35,10 +35,7 @@ class StandupPanel {
   }
 
   getHtml(report) {
-    const escaped = report
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
+    const escaped = report.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
     return `<!DOCTYPE html>
 <html lang="en">

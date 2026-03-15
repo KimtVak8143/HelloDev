@@ -13,16 +13,19 @@ const LOG_LEVEL = process.env.LOG_LEVEL || "info";
 // Create pino logger instance
 const baseLogger = pino({ level: LOG_LEVEL.toLowerCase() });
 
-// Pino HTTP middleware for Express 
+// Pino HTTP middleware for Express
 function requestLogger(req, res, next) {
   const start = Date.now();
   const { method, url } = req;
-  
+
   res.on("finish", () => {
     const duration = Date.now() - start;
-    baseLogger.info({ method, url, status: res.statusCode, duration, module: "http" }, `${method} ${url}`);
+    baseLogger.info(
+      { method, url, status: res.statusCode, duration, module: "http" },
+      `${method} ${url}`
+    );
   });
-  
+
   next();
 }
 

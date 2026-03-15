@@ -18,9 +18,7 @@ async function handleMyTasks(state, output) {
   try {
     const { identity, tasks } = await getMyTasks(state);
     if (tasks.length === 0) {
-      await vscode.window.showInformationMessage(
-        `No pending tasks for ${identity.name}.`
-      );
+      await vscode.window.showInformationMessage(`No pending tasks for ${identity.name}.`);
       return;
     }
 
@@ -49,9 +47,7 @@ async function handleStartTask(state, output) {
   try {
     const { identity, tasks } = await getMyTasks(state);
     if (tasks.length === 0) {
-      await vscode.window.showInformationMessage(
-        `No pending tasks for ${identity.name}.`
-      );
+      await vscode.window.showInformationMessage(`No pending tasks for ${identity.name}.`);
       return;
     }
 
@@ -76,9 +72,7 @@ async function handleStartTask(state, output) {
     await registerDeveloper(state, "developer");
     output.info(`Session started for ${session.taskId} by ${session.developerName}`);
 
-    await vscode.window.showInformationMessage(
-      `Started ${session.taskId}: ${session.taskName}`
-    );
+    await vscode.window.showInformationMessage(`Started ${session.taskId}: ${session.taskName}`);
   } catch (error) {
     output.error(`startTask failed: ${error.message}`);
     await vscode.window.showErrorMessage(`HelloDev Start Task failed: ${error.message}`);
@@ -212,10 +206,7 @@ function registerHelloDevCommands(context, _state, output) {
     OnboardingPanel.open(context, _state, output);
   };
 
-  const onboardingCommands = [
-    "hellodev.openOnboarding",
-    "hellodev.openonboarding"
-  ];
+  const onboardingCommands = ["hellodev.openOnboarding", "hellodev.openonboarding"];
   for (const commandId of onboardingCommands) {
     const disposable = vscode.commands.registerCommand(commandId, async () => {
       await openOnboarding(commandId);

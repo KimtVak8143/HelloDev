@@ -15,10 +15,7 @@ function runGitConfig(key) {
 }
 
 async function getGitIdentity() {
-  const [name, email] = await Promise.all([
-    runGitConfig("user.name"),
-    runGitConfig("user.email")
-  ]);
+  const [name, email] = await Promise.all([runGitConfig("user.name"), runGitConfig("user.email")]);
 
   return {
     name,

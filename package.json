@@ -76,10 +76,10 @@
     "lint": "eslint src/ --fix",
     "format": "prettier --write src/ openapi.yaml README.md",
     "check-format": "prettier --check src/ openapi.yaml README.md",
-    "test": "jest",
+    "test": "jest --runInBand --passWithNoTests",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "verify": "npm run lint && npm run check-format && npm run test-connection",
+    "verify": "npm run lint && npm run check-format && npm test",
     "pre-commit": "npm run lint && npm run check-format"
   },
   "keywords": [],

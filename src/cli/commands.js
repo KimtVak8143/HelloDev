@@ -89,7 +89,9 @@ const colors = {
       } else {
         data.tasks.forEach((t) => {
           const statusColor = t.status === "In Progress" ? colors.yellow : colors.cyan;
-          console.log(`  [${statusColor(t.status)}] ${colors.bold(t.id)} — ${t.name} (${t.priority})`);
+          console.log(
+            `  [${statusColor(t.status)}] ${colors.bold(t.id)} — ${t.name} (${t.priority})`
+          );
         });
         console.log();
       }
@@ -99,7 +101,9 @@ const colors = {
     else {
       console.log(colors.bold("\n🚀 HelloDev Tracker CLI"));
       console.log("─────────────────────────────────");
-      console.log(`  ${colors.cyan("hellodev start <bug-id> --dev <name>")}  Start tracking a task`);
+      console.log(
+        `  ${colors.cyan("hellodev start <bug-id> --dev <name>")}  Start tracking a task`
+      );
       console.log(`  ${colors.cyan("hellodev done <bug-id>")}                Mark task complete`);
       console.log(`  ${colors.cyan("hellodev status")}                       Show active session`);
       console.log(`  ${colors.cyan("hellodev tasks <developer-name>")}       View pending tasks\n`);
