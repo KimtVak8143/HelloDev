@@ -4,6 +4,7 @@ const vscode = require("vscode");
 const { captureNotionToken } = require("./notionAuth");
 const { setupMaintainerWorkspace } = require("./setupMaintainer");
 const { getGitIdentity } = require("../utils/identity");
+const { registerDeveloper } = require("../runtime/actions");
 
 class OnboardingPanel {
   static currentPanel = undefined;
@@ -84,6 +85,14 @@ class OnboardingPanel {
                 ? ` Detected: ${identity.name} (${identity.email})`
                 : "")
           );
+          if (identity.isComplete) {
+            try {
+              await registerDeveloper(this.state, "developer");
+              this.output.info("Developer profile upserted in Notion Developers DB");
+            } catch (error) {
+              this.output.warn(`Developer upsert skipped: ${error.message}`);
+            }
+          }
         }
       }
       return;

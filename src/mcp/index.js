@@ -3,7 +3,15 @@
 const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
 const { StdioServerTransport } = require("@modelcontextprotocol/sdk/server/stdio.js");
 const { z } = require("zod");
-const { getMyTasks, startTask, getStatus, completeTask } = require("../runtime/actions");
+const {
+  getMyTasks,
+  startTask,
+  getStatus,
+  completeTask,
+  getSprint,
+  logCommit,
+  generateStandup
+} = require("../runtime/actions");
 
 function text(message) {
   return { content: [{ type: "text", text: message }] };
@@ -75,7 +83,54 @@ function createMcpServer(state, output) {
     }
   });
 
-  output.info("MCP tools registered: list_tasks, start_task, get_status, complete_task");
+  server.tool("get_sprint", "Get sprint board grouped by status.", {}, async () => {
+    try {
+      const board = await getSprint(state);
+      const lines = Object.entries(board).map(([status, items]) => {
+        return `${status}: ${items.length}`;
+      });
+      return text(`Sprint board summary:\n${lines.join("\n")}`);
+    } catch (error) {
+      return text(`Error: ${error.message}`);
+    }
+  });
+
+  server.tool(
+    "log_commit",
+    "Log commit stats into active session and Notion activity log.",
+    {
+      message: z.string().describe("Commit message"),
+      files_changed: z.number().optional(),
+      lines_added: z.number().optional(),
+      lines_removed: z.number().optional()
+    },
+    async ({ message, files_changed, lines_added, lines_removed }) => {
+      try {
+        const result = await logCommit(state, {
+          message,
+          filesChanged: files_changed || 0,
+          linesAdded: lines_added || 0,
+          linesRemoved: lines_removed || 0
+        });
+        return text(`Commit logged. Total commits in session: ${result.commits}`);
+      } catch (error) {
+        return text(`Error: ${error.message}`);
+      }
+    }
+  );
+
+  server.tool("generate_standup", "Generate last-24h standup summary.", {}, async () => {
+    try {
+      const report = await generateStandup(state);
+      return text(report);
+    } catch (error) {
+      return text(`Error: ${error.message}`);
+    }
+  });
+
+  output.info(
+    "MCP tools registered: list_tasks, start_task, get_status, complete_task, get_sprint, log_commit, generate_standup"
+  );
   return server;
 }
 

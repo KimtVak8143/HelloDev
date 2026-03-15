@@ -4,7 +4,11 @@ const { getGitIdentity } = require("../utils/identity");
 const {
   listTasksForDeveloper,
   startTaskForDeveloper,
-  completeTaskForDeveloper
+  completeTaskForDeveloper,
+  listSprintBoard,
+  upsertDeveloper,
+  generateStandupReport,
+  syncActiveLogStats
 } = require("../notion/runtimeTasks");
 const { clearSession, saveSession } = require("./sessionStore");
 
@@ -78,9 +82,41 @@ async function completeTask(state) {
   return { active, result };
 }
 
+async function registerDeveloper(state, role) {
+  const identity = await requireDeveloperIdentity();
+  return upsertDeveloper(state, identity, role || "developer");
+}
+
+async function getSprint(state) {
+  return listSprintBoard(state);
+}
+
+async function logCommit(state, commit) {
+  const active = state.getActiveSession();
+  if (!active) {
+    throw new Error("No active session running.");
+  }
+  active.commits.push(commit.message || "");
+  active.filesChanged += Number(commit.filesChanged || 0);
+  active.linesAdded += Number(commit.linesAdded || 0);
+  active.linesRemoved += Number(commit.linesRemoved || 0);
+  state.setActiveSession(active);
+  saveSession(active);
+  await syncActiveLogStats(state, active);
+  return { commits: active.commits.length };
+}
+
+async function generateStandup(state) {
+  return generateStandupReport(state);
+}
+
 module.exports = {
   getMyTasks,
   startTask,
   getStatus,
-  completeTask
+  completeTask,
+  registerDeveloper,
+  getSprint,
+  logCommit,
+  generateStandup
 };

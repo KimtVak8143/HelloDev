@@ -2,12 +2,15 @@
 
 const vscode = require("vscode");
 const { OnboardingPanel } = require("../onboarding/OnboardingPanel");
-const { getMyTasks, startTask, getStatus, completeTask } = require("../runtime/actions");
+const {
+  getMyTasks,
+  startTask,
+  getStatus,
+  completeTask,
+  registerDeveloper,
+  generateStandup
+} = require("../runtime/actions");
 const { installGitHooks } = require("../trackers/gitHook");
-
-function notImplemented(label) {
-  return `HelloDev: ${label} is scaffolded and next in implementation.`;
-}
 
 async function handleMyTasks(state, output) {
   try {
@@ -68,6 +71,7 @@ async function handleStartTask(state, output) {
     }
 
     const session = await startTask(state, picked.task);
+    await registerDeveloper(state, "developer");
     output.info(`Session started for ${session.taskId} by ${session.developerName}`);
 
     await vscode.window.showInformationMessage(
@@ -114,19 +118,20 @@ async function handleInstallGitHook(output) {
   }
 }
 
-function registerHelloDevCommands(context, _state, output) {
-  const scaffoldCommands = [
-    ["hellodev.generateStandup", "Generate Standup"]
-  ];
-
-  for (const [commandId, label] of scaffoldCommands) {
-    const disposable = vscode.commands.registerCommand(commandId, async () => {
-      output.info(`Command invoked: ${commandId}`);
-      await vscode.window.showInformationMessage(notImplemented(label));
-    });
-    context.subscriptions.push(disposable);
+async function handleGenerateStandup(state, output) {
+  try {
+    const report = await generateStandup(state);
+    output.info("Standup generated");
+    await vscode.window.showInformationMessage("HelloDev standup generated. See output panel.");
+    output.show(true);
+    output.info(report);
+  } catch (error) {
+    output.error(`generateStandup failed: ${error.message}`);
+    await vscode.window.showErrorMessage(`HelloDev Generate Standup failed: ${error.message}`);
   }
+}
 
+function registerHelloDevCommands(context, _state, output) {
   const startTaskCommand = vscode.commands.registerCommand("hellodev.startTask", async () => {
     output.info("Command invoked: hellodev.startTask");
     await handleStartTask(_state, output);
@@ -159,6 +164,15 @@ function registerHelloDevCommands(context, _state, output) {
     }
   );
   context.subscriptions.push(installGitHookCommand);
+
+  const generateStandupCommand = vscode.commands.registerCommand(
+    "hellodev.generateStandup",
+    async () => {
+      output.info("Command invoked: hellodev.generateStandup");
+      await handleGenerateStandup(_state, output);
+    }
+  );
+  context.subscriptions.push(generateStandupCommand);
 
   const openOnboarding = async (commandId) => {
     output.info(`Command invoked: ${commandId}`);

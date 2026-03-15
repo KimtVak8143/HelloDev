@@ -56,6 +56,13 @@ async function listTasksForDeveloper(state, developerName) {
   }));
 }
 
+async function queryDatabase(state, databaseId, body) {
+  const headers = await createHeaders(state);
+  const url = `https://api.notion.com/v1/databases/${databaseId}/query`;
+  const response = await axios.post(url, body || {}, { headers });
+  return response.data.results || [];
+}
+
 async function startTaskForDeveloper(state, task, developerName) {
   const ids = requireWorkspaceConfig(state);
   if (!ids.logsDbId) {
@@ -171,9 +178,133 @@ async function completeTaskForDeveloper(state, activeSession) {
   return { hours };
 }
 
+async function listSprintBoard(state) {
+  const ids = requireWorkspaceConfig(state);
+  const pages = await queryDatabase(state, ids.sprintDbId, {});
+  const grouped = {
+    Todo: [],
+    "In Progress": [],
+    Done: [],
+    Blocked: [],
+    Unknown: []
+  };
+
+  for (const page of pages) {
+    const task = {
+      id: safeText(page.properties?.["Bug/Feature ID"]?.rich_text) || "N/A",
+      name: safeText(page.properties?.["Task Name"]?.title) || "Untitled",
+      status: page.properties?.Status?.select?.name || "Unknown",
+      assignedTo: safeText(page.properties?.["Assigned To"]?.rich_text) || "Unassigned",
+      priority: page.properties?.Priority?.select?.name || "Unknown"
+    };
+
+    if (!grouped[task.status]) {
+      grouped.Unknown.push(task);
+    } else {
+      grouped[task.status].push(task);
+    }
+  }
+
+  return grouped;
+}
+
+async function upsertDeveloper(state, identity, role) {
+  const ids = state.getWorkspaceDatabaseIds();
+  if (!ids.devsDbId) {
+    return { upserted: false, reason: "missing_devs_db" };
+  }
+
+  const pages = await queryDatabase(state, ids.devsDbId, {
+    filter: {
+      property: "Email",
+      email: { equals: identity.email || "" }
+    }
+  });
+
+  const headers = await createHeaders(state);
+  if (pages.length > 0) {
+    const existing = pages[0];
+    await axios.patch(
+      `https://api.notion.com/v1/pages/${existing.id}`,
+      {
+        properties: {
+          Name: { title: [{ text: { content: identity.name || "Unknown" } }] },
+          Email: { email: identity.email || null },
+          Role: { select: { name: role === "maintainer" ? "Maintainer" : "Developer" } }
+        }
+      },
+      { headers }
+    );
+    return { upserted: true, action: "updated", pageId: existing.id };
+  }
+
+  const created = await axios.post(
+    "https://api.notion.com/v1/pages",
+    {
+      parent: { database_id: ids.devsDbId },
+      properties: {
+        Name: { title: [{ text: { content: identity.name || "Unknown" } }] },
+        Email: { email: identity.email || null },
+        Role: { select: { name: role === "maintainer" ? "Maintainer" : "Developer" } }
+      }
+    },
+    { headers }
+  );
+  return { upserted: true, action: "created", pageId: created.data.id };
+}
+
+function getDateHoursAgo(hours) {
+  return new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+}
+
+async function generateStandupReport(state) {
+  const ids = state.getWorkspaceDatabaseIds();
+  if (!ids.logsDbId) {
+    throw new Error("Activity Logs database is not configured.");
+  }
+
+  const logs = await queryDatabase(state, ids.logsDbId, {
+    filter: {
+      property: "Session Start",
+      date: { on_or_after: getDateHoursAgo(24) }
+    }
+  });
+
+  const byDev = {};
+  for (const page of logs) {
+    const developer = safeText(page.properties?.Developer?.rich_text) || "Unknown";
+    const commits = page.properties?.["Commits Count"]?.number || 0;
+    const hours = page.properties?.["Total Time (hrs)"]?.number || 0;
+    const status = page.properties?.Status?.select?.name || "Unknown";
+    if (!byDev[developer]) {
+      byDev[developer] = { hours: 0, commits: 0, completed: 0, active: 0 };
+    }
+    byDev[developer].hours += hours;
+    byDev[developer].commits += commits;
+    if (status === "Completed") {
+      byDev[developer].completed += 1;
+    }
+    if (status === "Active") {
+      byDev[developer].active += 1;
+    }
+  }
+
+  const lines = Object.entries(byDev).map(([dev, stats]) => {
+    return `${dev}: ${stats.hours.toFixed(2)} hrs, ${stats.commits} commits, ${stats.completed} completed, ${stats.active} active`;
+  });
+
+  if (lines.length === 0) {
+    return "Standup: no activity logs found in last 24 hours.";
+  }
+  return `Standup (last 24h)\n${lines.join("\n")}`;
+}
+
 module.exports = {
   listTasksForDeveloper,
   startTaskForDeveloper,
   syncActiveLogStats,
-  completeTaskForDeveloper
+  completeTaskForDeveloper,
+  listSprintBoard,
+  upsertDeveloper,
+  generateStandupReport
 };
