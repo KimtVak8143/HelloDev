@@ -3,6 +3,15 @@
   "displayName": "HelloDev Tracker",
   "version": "1.0.0",
   "description": "HelloDev - Agentic Sprint Tracker powered by Notion MCP",
+  "publisher": "hellodev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/KimtVak8143/HelloDev.git"
+  },
+  "homepage": "https://github.com/KimtVak8143/HelloDev",
+  "bugs": {
+    "url": "https://github.com/KimtVak8143/HelloDev/issues"
+  },
   "main": "src/extension.js",
   "engines": {
     "vscode": "^1.95.0"
@@ -18,7 +27,8 @@
     "onCommand:hellodev.myTasks",
     "onCommand:hellodev.generateStandup",
     "onCommand:hellodev.installGitHook",
-    "onCommand:hellodev.openOnboarding"
+    "onCommand:hellodev.openOnboarding",
+    "onCommand:hellodev.openonboarding"
   ],
   "contributes": {
     "commands": [
@@ -56,20 +66,20 @@
     "hellodev": "./src/cli/commands.js"
   },
   "scripts": {
-    "start": "node src/server.js",
+    "start": "node src/extension.js",
     "test-connection": "node test-connection.js",
     "build": "npm run verify",
-    "dev": "node src/server.js",
+    "dev": "node src/extension.js",
     "mcp": "node src/mcp/index.js",
     "all": "concurrently \"npm run dev\" \"npm run mcp\"",
     "package:vsix": "vsce package",
     "lint": "eslint src/ --fix",
     "format": "prettier --write src/ openapi.yaml README.md",
     "check-format": "prettier --check src/ openapi.yaml README.md",
-    "test": "jest",
+    "test": "jest --runInBand --passWithNoTests",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "verify": "npm run lint && npm run check-format && npm run test-connection",
+    "verify": "npm run lint && npm run check-format && npm test",
     "pre-commit": "npm run lint && npm run check-format"
   },
   "keywords": [],

@@ -15,7 +15,6 @@ module.exports = [
       "no-console": "off",
       eqeqeq: ["error", "always"],
       curly: ["error", "all"],
-      indent: ["error", 2],
       quotes: ["error", "double"],
       semi: ["error", "always"],
       "comma-dangle": ["error", "never"]

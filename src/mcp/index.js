@@ -1,196 +1,147 @@
-#!/usr/bin/env node
-// ─── HelloDev MCP Server ───────────────────────────────────────────────────────────
-// Exposes HelloDev Sprint Tracker as MCP tools for Copilot / Claude in VSCode
-// Developer can chat naturally instead of memorizing CLI commands
-//
-// Tools exposed:
-//   • list_tasks      — "What are my tasks?"
-//   • start_task      — "Start working on bug-#1"
-//   • complete_task   — "I'm done with bug-#1"
-//   • get_status      — "How long have I been working?"
-//   • get_sprint      — "Show me the full sprint board"
+"use strict";
 
-require("dotenv").config();
-const { McpServer }    = require("@modelcontextprotocol/sdk/server/mcp.js");
+const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
 const { StdioServerTransport } = require("@modelcontextprotocol/sdk/server/stdio.js");
-const { z }            = require("zod");
-const axios            = require("axios");
+const { z } = require("zod");
+const {
+  getMyTasks,
+  startTask,
+  getStatus,
+  completeTask,
+  getSprint,
+  logCommit,
+  generateStandup
+} = require("../runtime/actions");
 
-const BASE = `http://localhost:${process.env.PORT || 3333}`;
-
-// ─── Helper: call HelloDev Express server ─────────────────────────────────────────
-async function callHelloDev(method, path, body = null) {
-  try {
-    const res = method === "get"
-      ? await axios.get(`${BASE}${path}`)
-      : await axios.post(`${BASE}${path}`, body);
-    return { ok: true, data: res.data };
-  } catch (err) {
-    const msg = err.response?.data?.error || err.message;
-    if (err.code === "ECONNREFUSED") {
-      return { ok: false, error: "HelloDev server is not running. Please start it with: npm run dev" };
-    }
-    return { ok: false, error: msg };
-  }
+function text(message) {
+  return { content: [{ type: "text", text: message }] };
 }
 
-function text(content) {
-  return { content: [{ type: "text", text: content }] };
+function formatTasks(identity, tasks) {
+  if (!tasks.length) {
+    return `No pending tasks for ${identity.name}.`;
+  }
+  return tasks
+    .map(
+      (task, index) =>
+        `${index + 1}. [${task.status}] ${task.id} - ${task.name} (${task.priority}, ${task.points} pts)`
+    )
+    .join("\n");
 }
 
-// ─── Create MCP Server ────────────────────────────────────────────────────────
-const server = new McpServer({
-  name:    "HelloDev-tracker",
-  version: "1.0.0"
-});
+function createMcpServer(state, output) {
+  const server = new McpServer({
+    name: "hellodev-tracker",
+    version: "1.0.0"
+  });
 
-// ─── TOOL: list_tasks ─────────────────────────────────────────────────────────
-server.tool(
-  "list_tasks",
-  "List all pending tasks assigned to a developer from the Notion Sprint Board",
-  {
-    developer: z.string().describe("Developer name e.g. Alice, Bob")
-  },
-  async ({ developer }) => {
-    const result = await callHelloDev("get", `/tasks/${developer}`);
-    if (!result.ok) {return text(`❌ ${result.error}`);}
-
-    const { tasks } = result.data;
-    if (!tasks.length) {return text(`✅ No pending tasks for ${developer}. Sprint board is clear!`);}
-
-    const lines = tasks.map((t, i) =>
-      `  ${i + 1}. [${t.status}] ${t.id} — ${t.name}\n     Priority: ${t.priority} | Story Points: ${t.points}`
-    ).join("\n");
-
-    return text(`📋 Tasks for ${developer}:\n\n${lines}\n\nRun start_task to begin working on one.`);
-  }
-);
-
-// ─── TOOL: start_task ─────────────────────────────────────────────────────────
-server.tool(
-  "start_task",
-  "Start tracking a task — marks it In Progress in Notion and starts the activity log",
-  {
-    bug_id:    z.string().describe("Bug or Feature ID e.g. bug-#1, feature-#2"),
-    developer: z.string().describe("Developer name e.g. Alice")
-  },
-  async ({ bug_id, developer }) => {
-    const result = await callHelloDev("post", "/start", { bugId: bug_id, developer });
-    if (!result.ok) {return text(`❌ ${result.error}`);}
-
-    const { taskName, logId, startedAt } = result.data;
-    return text(
-      "🚀 Session started!\n\n" +
-      `  Task:      ${taskName} (${bug_id})\n` +
-      `  Developer: ${developer}\n` +
-      `  Started:   ${new Date(startedAt).toLocaleTimeString()}\n` +
-      `  Log ID:    ${logId}\n\n` +
-      "Notion updated → In Progress ✅\n" +
-      "Timer running in background ⏱️\n\n" +
-      "Git commits will be auto-logged. Run complete_task when done."
-    );
-  }
-);
-
-// ─── TOOL: complete_task ──────────────────────────────────────────────────────
-server.tool(
-  "complete_task",
-  "Complete the active task — marks it Done in Notion and seals the activity log with stats",
-  {
-    bug_id: z.string().describe("Bug or Feature ID e.g. bug-#1")
-  },
-  async ({ bug_id }) => {
-    const result = await callHelloDev("post", "/done", { bugId: bug_id });
-    if (!result.ok) {return text(`❌ ${result.error}`);}
-
-    const { taskName, developer, totalHrs, commits, filesChanged, linesAdded, linesRemoved } = result.data;
-    return text(
-      "🎉 Task Complete!\n\n" +
-      `  Task:          ${taskName} (${bug_id})\n` +
-      `  Developer:     ${developer}\n\n` +
-      "📊 Session Stats:\n" +
-      `  ⏱️  Time:         ${totalHrs} hrs\n` +
-      `  📝 Commits:      ${commits}\n` +
-      `  📁 Files Changed: ${filesChanged}\n` +
-      `  ➕ Lines Added:   ${linesAdded}\n` +
-      `  ➖ Lines Removed: ${linesRemoved}\n\n` +
-      "Notion updated → Done ✅\n" +
-      "Activity Log sealed and linked to task ✅"
-    );
-  }
-);
-
-// ─── TOOL: get_status ─────────────────────────────────────────────────────────
-server.tool(
-  "get_status",
-  "Get the current active session — elapsed time, commits, which task is being worked on",
-  {},
-  async () => {
-    const result = await callHelloDev("get", "/status");
-    if (!result.ok) {return text(`❌ ${result.error}`);}
-
-    const data = result.data;
-    if (!data.active) {
-      return text("💤 No active session running.\n\nUse list_tasks to see what's available, then start_task to begin.");
+  server.tool("list_tasks", "List pending tasks assigned to current developer.", {}, async () => {
+    try {
+      const { identity, tasks } = await getMyTasks(state);
+      return text(`Tasks for ${identity.name}:\n${formatTasks(identity, tasks)}`);
+    } catch (error) {
+      return text(`Error: ${error.message}`);
     }
+  });
 
-    return text(
-      "⚡ Active Session\n\n" +
-      `  Task:      ${data.taskName} (${data.bugId})\n` +
-      `  Developer: ${data.developer}\n` +
-      `  Elapsed:   ${data.elapsed}\n` +
-      `  Commits:   ${data.commits}\n\n` +
-      "Keep going! Run complete_task when you're done."
-    );
-  }
-);
+  server.tool(
+    "start_task",
+    "Start a task by bug/feature id assigned to current developer.",
+    { bug_id: z.string().describe("Bug or feature id, e.g. bug-#1") },
+    async ({ bug_id }) => {
+      try {
+        const { tasks } = await getMyTasks(state);
+        const task = tasks.find((item) => item.id === bug_id);
+        if (!task) {
+          return text(`Task not found for current developer: ${bug_id}`);
+        }
 
-// ─── TOOL: get_sprint ─────────────────────────────────────────────────────────
-server.tool(
-  "get_sprint",
-  "Get a full overview of the current sprint — all tasks and their statuses",
-  {
-    developer: z.string().optional().describe("Filter by developer name (optional)")
-  },
-  async ({ developer }) => {
-    const result = await callHelloDev("get", "/");
-    if (!result.ok) {return text(`❌ ${result.error}`);}
-
-    // Also get tasks if developer provided
-    if (developer) {
-      const tasks = await callHelloDev("get", `/tasks/${developer}`);
-      if (!tasks.ok) {return text(`❌ ${tasks.error}`);}
-
-      const list = tasks.data.tasks;
-      if (!list.length) {return text(`✅ ${developer} has no pending tasks!`);}
-
-      const lines = list.map(t =>
-        `  [${t.status.padEnd(11)}] ${t.id.padEnd(12)} ${t.name} (${t.priority})`
-      ).join("\n");
-
-      return text(`📋 Sprint Overview for ${developer}:\n\n${lines}`);
+        const session = await startTask(state, task);
+        return text(`Started ${session.taskId}: ${session.taskName}`);
+      } catch (error) {
+        return text(`Error: ${error.message}`);
+      }
     }
+  );
 
-    const session = result.data.session;
+  server.tool("get_status", "Get current active session status.", {}, async () => {
+    const status = getStatus(state);
+    if (!status.active) {
+      return text("No active session running.");
+    }
     return text(
-      "🚀 HelloDev Sprint Tracker\n\n" +
-      `Server: Running on port ${process.env.PORT || 3333}\n\n` +
-      (session
-        ? `Active Session:\n  ${session.developer} → ${session.bugId} | ${session.elapsed} | ${session.commits} commits`
-        : "No active session. Use list_tasks to get started."
-      )
+      `Active: ${status.taskId} (${status.taskName}) | ${status.elapsed} | ${status.commits} commits`
     );
-  }
-);
+  });
 
-// ─── Start MCP Server ─────────────────────────────────────────────────────────
-async function main() {
+  server.tool("complete_task", "Complete current active task.", {}, async () => {
+    try {
+      const { active, result } = await completeTask(state);
+      return text(`Completed ${active.taskId}: ${active.taskName} (${result.hours} hrs)`);
+    } catch (error) {
+      return text(`Error: ${error.message}`);
+    }
+  });
+
+  server.tool("get_sprint", "Get sprint board grouped by status.", {}, async () => {
+    try {
+      const board = await getSprint(state);
+      const lines = Object.entries(board).map(([status, items]) => {
+        return `${status}: ${items.length}`;
+      });
+      return text(`Sprint board summary:\n${lines.join("\n")}`);
+    } catch (error) {
+      return text(`Error: ${error.message}`);
+    }
+  });
+
+  server.tool(
+    "log_commit",
+    "Log commit stats into active session and Notion activity log.",
+    {
+      message: z.string().describe("Commit message"),
+      files_changed: z.number().optional(),
+      lines_added: z.number().optional(),
+      lines_removed: z.number().optional()
+    },
+    async ({ message, files_changed, lines_added, lines_removed }) => {
+      try {
+        const result = await logCommit(state, {
+          message,
+          filesChanged: files_changed || 0,
+          linesAdded: lines_added || 0,
+          linesRemoved: lines_removed || 0
+        });
+        return text(`Commit logged. Total commits in session: ${result.commits}`);
+      } catch (error) {
+        return text(`Error: ${error.message}`);
+      }
+    }
+  );
+
+  server.tool("generate_standup", "Generate last-24h standup summary.", {}, async () => {
+    try {
+      const report = await generateStandup(state);
+      return text(report);
+    } catch (error) {
+      return text(`Error: ${error.message}`);
+    }
+  });
+
+  output.info(
+    "MCP tools registered: list_tasks, start_task, get_status, complete_task, get_sprint, log_commit, generate_standup"
+  );
+  return server;
+}
+
+async function startStdioMcpServer(state, output) {
+  const server = createMcpServer(state, output);
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("✅ HelloDev MCP Server running — waiting for tool calls...");
+  return { server, transport };
 }
 
-main().catch(err => {
-  console.error("❌ MCP Server error:", err);
-  process.exit(1);
-});
+module.exports = {
+  createMcpServer,
+  startStdioMcpServer
+};

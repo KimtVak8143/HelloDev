@@ -42,7 +42,7 @@ paths:
       summary: Server health check
       description: Returns server status and active session info if any.
       responses:
-        '200':
+        "200":
           description: Server is running
           content:
             application/json:
@@ -54,7 +54,7 @@ paths:
                     example: "HelloDev Tracker running 🚀"
                   session:
                     nullable: true
-                    $ref: '#/components/schemas/SessionSummary'
+                    $ref: "#/components/schemas/SessionSummary"
               examples:
                 no_session:
                   summary: No active session
@@ -85,17 +85,17 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/StartRequest'
+              $ref: "#/components/schemas/StartRequest"
             example:
               bugId: "bug-#1"
               developer: "Alice"
       responses:
-        '200':
+        "200":
           description: Session started successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/StartResponse'
+                $ref: "#/components/schemas/StartResponse"
               example:
                 status: "started"
                 bugId: "bug-#1"
@@ -103,30 +103,30 @@ paths:
                 developer: "Alice"
                 logId: "abc123-def456-789"
                 startedAt: "2025-03-10T08:00:00.000Z"
-        '400':
+        "400":
           description: Missing required fields
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
               example:
                 error: "bugId and developer are required"
-        '409':
+        "409":
           description: Session already active
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
               example:
                 error: "Session already active for bug-#1. Run /done first."
-        '500':
+        "500":
           description: Notion API error or task not found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
               example:
-                error: "Task \"bug-#99\" not found in Sprint Board"
+                error: 'Task "bug-#99" not found in Sprint Board'
 
   /done:
     post:
@@ -144,16 +144,16 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/DoneRequest'
+              $ref: "#/components/schemas/DoneRequest"
             example:
               bugId: "bug-#1"
       responses:
-        '200':
+        "200":
           description: Task completed successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DoneResponse'
+                $ref: "#/components/schemas/DoneResponse"
               example:
                 status: "completed"
                 bugId: "bug-#1"
@@ -164,20 +164,20 @@ paths:
                 filesChanged: 5
                 linesAdded: 120
                 linesRemoved: 45
-        '400':
+        "400":
           description: No active session
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
               example:
                 error: "No active session. Use /start first."
-        '409':
+        "409":
           description: Bug ID mismatch with active session
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
               example:
                 error: "Active session is for bug-#1, not bug-#2"
 
@@ -187,14 +187,14 @@ paths:
       summary: Get current session status
       description: Returns live info about the active developer session including elapsed time and commit count.
       responses:
-        '200':
+        "200":
           description: Session status
           content:
             application/json:
               schema:
                 oneOf:
-                  - $ref: '#/components/schemas/ActiveStatus'
-                  - $ref: '#/components/schemas/InactiveStatus'
+                  - $ref: "#/components/schemas/ActiveStatus"
+                  - $ref: "#/components/schemas/InactiveStatus"
               examples:
                 active:
                   summary: Session is running
@@ -217,7 +217,7 @@ paths:
       summary: Log a git commit
       description: |
         Records a git commit to the active session's activity log.
-        
+
         **Automatically called** by the `hooks/post-commit` git hook on every `git commit`.
         Can also be called manually for testing.
       requestBody:
@@ -225,19 +225,19 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CommitRequest'
+              $ref: "#/components/schemas/CommitRequest"
             example:
               message: "fix: resolve null pointer in login handler"
               filesChanged: 3
               linesAdded: 45
               linesRemoved: 12
       responses:
-        '200':
+        "200":
           description: Commit logged (or ignored if no active session)
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CommitResponse'
+                $ref: "#/components/schemas/CommitResponse"
               examples:
                 logged:
                   summary: Commit recorded
@@ -265,12 +265,12 @@ paths:
           example: Alice
           description: Developer's name exactly as it appears in Notion "Assigned To" field
       responses:
-        '200':
+        "200":
           description: Task list returned
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TaskListResponse'
+                $ref: "#/components/schemas/TaskListResponse"
               examples:
                 with_tasks:
                   summary: Tasks found
@@ -292,12 +292,12 @@ paths:
                   value:
                     developer: "Alice"
                     tasks: []
-        '500':
+        "500":
           description: Notion API error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
 
 components:
   schemas:
@@ -445,7 +445,7 @@ components:
         tasks:
           type: array
           items:
-            $ref: '#/components/schemas/Task'
+            $ref: "#/components/schemas/Task"
 
     Task:
       type: object
