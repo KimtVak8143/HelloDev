@@ -25,14 +25,21 @@ function registerHelloDevCommands(context, _state, output) {
     context.subscriptions.push(disposable);
   }
 
-  const onboardingCommand = vscode.commands.registerCommand(
+  const openOnboarding = async (commandId) => {
+    output.info(`Command invoked: ${commandId}`);
+    OnboardingPanel.open(context, _state, output);
+  };
+
+  const onboardingCommands = [
     "hellodev.openOnboarding",
-    async () => {
-      output.info("Command invoked: hellodev.openOnboarding");
-      OnboardingPanel.open(context, _state, output);
-    }
-  );
-  context.subscriptions.push(onboardingCommand);
+    "hellodev.openonboarding"
+  ];
+  for (const commandId of onboardingCommands) {
+    const disposable = vscode.commands.registerCommand(commandId, async () => {
+      await openOnboarding(commandId);
+    });
+    context.subscriptions.push(disposable);
+  }
 }
 
 module.exports = {

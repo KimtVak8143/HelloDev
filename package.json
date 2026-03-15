@@ -18,7 +18,8 @@
     "onCommand:hellodev.myTasks",
     "onCommand:hellodev.generateStandup",
     "onCommand:hellodev.installGitHook",
-    "onCommand:hellodev.openOnboarding"
+    "onCommand:hellodev.openOnboarding",
+    "onCommand:hellodev.openonboarding"
   ],
   "contributes": {
     "commands": [

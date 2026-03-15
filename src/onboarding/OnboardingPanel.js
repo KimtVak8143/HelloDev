@@ -2,6 +2,7 @@
 
 const vscode = require("vscode");
 const { captureNotionToken } = require("./notionAuth");
+const { setupMaintainerWorkspace } = require("./setupMaintainer");
 
 class OnboardingPanel {
   static currentPanel = undefined;
@@ -51,9 +52,25 @@ class OnboardingPanel {
       this.output.info(`Onboarding role selected: ${role}`);
       const tokenResult = await captureNotionToken(this.state, this.output);
       if (tokenResult.saved) {
-        await vscode.window.showInformationMessage(
-          `HelloDev onboarding complete for ${role}.`
-        );
+        if (role === "maintainer") {
+          try {
+            const setup = await setupMaintainerWorkspace(this.state, this.output);
+            if (setup.created) {
+              await vscode.window.showInformationMessage(
+                "HelloDev onboarding complete for maintainer. Databases created."
+              );
+            }
+          } catch (error) {
+            this.output.error(`Maintainer setup failed: ${error.message}`);
+            await vscode.window.showErrorMessage(
+              `HelloDev maintainer setup failed: ${error.message}`
+            );
+          }
+        } else {
+          await vscode.window.showInformationMessage(
+            `HelloDev onboarding complete for ${role}.`
+          );
+        }
       }
       return;
     }
